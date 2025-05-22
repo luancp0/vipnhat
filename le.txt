@@ -1978,7 +1978,7 @@ local function StartRainbowEffect()
     end)
 end
 
--- Player list functions
+-- Function to populate player list
 local function PopulatePlayerList()
     -- Clear existing buttons
     for _, child in pairs(PlayerScrollFrame:GetChildren()) do
@@ -2027,7 +2027,7 @@ local function PopulatePlayerList()
     -- Update canvas size based on number of players
     local contentHeight = #PlayerList * 35
     PlayerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
-end
+end  -- This is the correct end for the function
 
 -- Function to find nearest player
 local function FindNearestPlayer()
