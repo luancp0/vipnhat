@@ -1,408 +1,2077 @@
--- Roblox Executor Script
--- Features: Draggable GUI, Minimize, Close, Player Targeting, Teleport, Noclip, Distance Adjustment, Auto Platform, Position Saving, Nearest Player, Look At Body Part, Customizable Name Tags
+--[[ 
+███████╗███╗   ██╗██╗  ██╗ █████╗ ███╗   ██╗ ██████╗███████╗██████╗     
+██╔════╝████╗  ██║██║  ██║██╔══██╗████╗  ██║██╔════╝██╔════╝██╔══██╗    
+█████╗  ██╔██╗ ██║███████║███████║██╔██╗ ██║██║     █████╗  ██║  ██║    
+██╔══╝  ██║╚██╗██║██╔══██║██╔══██║██║╚██╗██║██║     ██╔══╝  ██║  ██║    
+███████╗██║ ╚████║██║  ██║██║  ██║██║ ╚████║╚██████╗███████╗██████╔╝    
+╚══════╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝╚══════╝╚═════╝     
+                                                                         
+██████╗  ██████╗ ██████╗ ██╗      ██████╗ ██╗  ██╗                      
+██╔══██╗██╔═══██╗██╔══██╗██║     ██╔═══██╗╚██╗██╔╝                      
+██████╔╝██║   ██║██████╔╝██║     ██║   ██║ ╚███╔╝                       
+██╔══██╗██║   ██║██╔══██╗██║     ██║   ██║ ██╔██╗                       
+██║  ██║╚██████╔╝██████╔╝███████╗╚██████╔╝██╔╝ ██╗                      
+╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝  ╚═╝                      
+                                                                         
+███████╗██╗  ██╗███████╗ ██████╗██╗   ██╗████████╗ ██████╗ ██████╗      
+██╔════╝╚██╗██╔╝██╔════╝██╔════╝██║   ██║╚══██╔══╝██╔═══██╗██╔══██╗     
+█████╗   ╚███╔╝ █████╗  ██║     ██║   ██║   ██║   ██║   ██║██████╔╝     
+██╔══╝   ██╔██╗ ██╔══╝  ██║     ██║   ██║   ██║   ██║   ██║██╔══██╗     
+███████╗██╔╝ ██╗███████╗╚██████╗╚██████╔╝   ██║   ╚██████╔╝██║  ██║     
+╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝    ╚═╝    ╚═════╝ ╚═╝  ╚═╝     
+                                                                         
+Enhanced Script v2.0 - Password Protected
+]]
 
--- Configuration (EDIT THESE VALUES)
-local KEY = "123456" -- Change this to your desired key
+-- Configuration
+local KEY = "123456"
+local ADMIN_PASSWORD = "987654321" -- Admin password for VIP features
 local EXPIRATION_DATE = {
     Year = 2025,
-    Month = 5,
-    Day = 22,
+    Month = 6,
+    Day = 30,
     Hour = 0,
     Minute = 0,
     Second = 0
 }
 
--- Services
+-- Roblox Services
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
 
--- Variables
+-- Local Player and References
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-local Camera = workspace.CurrentCamera
+local Camera = Workspace.CurrentCamera
 
 -- State Variables
-local NoClipping = false
 local Authenticated = false
-local Minimized = false
+local AdminAuthenticated = false
+local NoClipping = false
 local AutoPlatform = false
 local RunningAway = false
 local FollowingTarget = false
 local AutoNextTarget = false
-local SubMenuVisible = false
-local LookingAtPlayer = false
 local LookTarget = nil
-local LookBodyPart = "Head"  -- Default body part to look at
+local LookBodyPart = "Head"
 local BodyParts = {"Head", "UpperTorso", "HumanoidRootPart", "LeftFoot", "RightFoot"}
 local BodyPartIndex = 1
-
--- Distance Settings
 local DistanceBehind = 5
 local DistanceAbove = 0
 local DetectionRadius = 20
+local SavedPosition = nil
+local PlayerList = {}
+local TargetPlayer = nil
+local CurrentPanel = nil -- For tracking which settings panel is open
+local Minimized = false
+local AutoCheckPosition = false
+local LookingAtPlayer = false
+local SubMenuVisible = false
 
 -- Safe Position Boundaries
 local SafePositionMin = Vector3.new(-1000, -1000, -1000)
 local SafePositionMax = Vector3.new(1000, 1000, 1000)
 
--- Saved Position
-local SavedPosition = nil
+-- EXP Name Display Config
+local DisplayFontSize = 14
+local DisplayMode = "name" -- "name", "hp", "distance"
+local DisplayColor = Color3.fromRGB(255,255,255)
+local AllowWallDisplay = false
+local ShowExpName = true
+local ShowHP = true
 
--- Target Variables
-local TargetPlayer = nil
-local PlayerList = {}
+-- Icon Settings
+local IconSize = UDim2.new(0, 40, 0, 40)
+local IconDraggable = false
+local IconURL = "rbxassetid://7072719455" -- default
 
--- Player's name display settings
-local NameColor = Color3.fromRGB(255, 255, 255)  -- Default color: White
-local DisplayMode = "name"  -- Default: Show name
-local DisplayFontSize = 14  -- Default font size
-local ShowHP = true  -- Default: Show HP
+-- Settings Categories
+local SettingsCategories = {
+    "Display",
+    "Targeting",
+    "Movement",
+    "Appearance",
+    "Advanced"
+}
 
--- Create GUI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ExecutorGUI"
+-- Utility Functions
+local function createTween(object, properties, duration, easingStyle, easingDirection)
+    local info = TweenInfo.new(
+        duration or 0.3,
+        easingStyle or Enum.EasingStyle.Quad,
+        easingDirection or Enum.EasingDirection.Out
+    )
+    local tween = TweenService:Create(object, info, properties)
+    return tween
+end
+
+local function createRippleEffect(button)
+    local ripple = Instance.new("Frame")
+    ripple.Name = "Ripple"
+    ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+    ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ripple.BackgroundTransparency = 0.7
+    ripple.Position = UDim2.new(0.5, 0, 0.5, 0)
+    ripple.Size = UDim2.new(0, 0, 0, 0)
+    
+    local corner = Instance.new("UICorner", ripple)
+    corner.CornerRadius = UDim.new(1, 0)
+    
+    ripple.Parent = button
+    
+    local buttonSize = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) * 1.5
+    local goal = UDim2.new(0, buttonSize, 0, buttonSize)
+    
+    local tween = createTween(ripple, {Size = goal, BackgroundTransparency = 1}, 0.5)
+    tween:Play()
+    
+    tween.Completed:Connect(function()
+        ripple:Destroy()
+    end)
+end
+
+local function isExpired()
+    local now = os.time()
+    local expire = os.time({
+        year = EXPIRATION_DATE.Year,
+        month = EXPIRATION_DATE.Month,
+        day = EXPIRATION_DATE.Day,
+        hour = EXPIRATION_DATE.Hour,
+        min = EXPIRATION_DATE.Minute,
+        sec = EXPIRATION_DATE.Second,
+    })
+    return now > expire
+end
+
+local function saveSettings()
+    -- Create settings table
+    local settings = {
+        DisplayFontSize = DisplayFontSize,
+        DisplayMode = DisplayMode,
+        DisplayColor = {
+            R = DisplayColor.R,
+            G = DisplayColor.G,
+            B = DisplayColor.B
+        },
+        AllowWallDisplay = AllowWallDisplay,
+        ShowExpName = ShowExpName,
+        ShowHP = ShowHP,
+        IconSize = {
+            X = IconSize.X.Scale,
+            XOffset = IconSize.X.Offset,
+            Y = IconSize.Y.Scale,
+            YOffset = IconSize.Y.Offset
+        },
+        IconDraggable = IconDraggable,
+        IconURL = IconURL,
+        DistanceBehind = DistanceBehind,
+        DistanceAbove = DistanceAbove,
+        DetectionRadius = DetectionRadius,
+        SafePositionMin = {
+            X = SafePositionMin.X,
+            Y = SafePositionMin.Y,
+            Z = SafePositionMin.Z
+        },
+        SafePositionMax = {
+            X = SafePositionMax.X,
+            Y = SafePositionMax.Y,
+            Z = SafePositionMax.Z
+        }
+    }
+    
+    -- Convert to JSON and save to GlobalStorage
+    local success, result = pcall(function()
+        return HttpService:JSONEncode(settings)
+    end)
+    
+    if success then
+        -- In a real script, you would save this to a file or datastore
+        -- For now, we'll just print it
+        print("Settings saved: " .. result)
+    end
+end
+
+local function loadSettings()
+    -- In a real script, you would load from a file or datastore
+    -- For this example, we'll just use the defaults
+    -- This is where you would decode the JSON and apply the settings
+    print("Settings loaded")
+end
+
+-- GUI Creation
+local ScreenGui = Instance.new("ScreenGui", PlayerGui)
+ScreenGui.Name = "ExecutorUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Main Frame
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 350, 0, 400) -- Reduced height
-MainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 350, 0, 450)
+MainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true -- Enable built-in dragging
-MainFrame.Parent = ScreenGui
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
 
--- Add UICorner for rounded corners
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 8)
-MainCorner.Parent = MainFrame
+local MainUICorner = Instance.new("UICorner", MainFrame)
+MainUICorner.CornerRadius = UDim.new(0, 10)
 
--- Add UIStroke for rainbow border
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Thickness = 2
-MainStroke.Color = Color3.fromRGB(255, 0, 0)
-MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-MainStroke.Parent = MainFrame
+local UIStroke = Instance.new("UIStroke", MainFrame)
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(255, 0, 0)
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
--- Title Bar
-local TitleBar = Instance.new("Frame")
-TitleBar.Name = "TitleBar"
+local TitleBar = Instance.new("Frame", MainFrame)
 TitleBar.Size = UDim2.new(1, 0, 0, 30)
 TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-TitleBar.BorderSizePixel = 0
-TitleBar.Parent = MainFrame
 
--- Add UICorner for title bar
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 8)
-TitleCorner.Parent = TitleBar
+local TitleBarCorner = Instance.new("UICorner", TitleBar)
+TitleBarCorner.CornerRadius = UDim.new(0, 10)
 
--- Title
-local Title = Instance.new("TextLabel")
-Title.Name = "Title"
+local TitleBarBottom = Instance.new("Frame", TitleBar)
+TitleBarBottom.Size = UDim2.new(1, 0, 0.5, 0)
+TitleBarBottom.Position = UDim2.new(0, 0, 0.5, 0)
+TitleBarBottom.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TitleBarBottom.BorderSizePixel = 0
+
+local Title = Instance.new("TextLabel", TitleBar)
 Title.Size = UDim2.new(1, -90, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 Title.Font = Enum.Font.SourceSansBold
-Title.Text = "Roblox Executor"
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = TitleBar
+Title.Text = "Roblox Executor Script v2.0"
 
--- SubMenu Button
-local SubMenuButton = Instance.new("TextButton")
-SubMenuButton.Name = "SubMenuButton"
-SubMenuButton.Size = UDim2.new(0, 30, 0, 30)
-SubMenuButton.Position = UDim2.new(1, -90, 0, 0)
-SubMenuButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-SubMenuButton.BorderSizePixel = 0
-SubMenuButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-SubMenuButton.TextSize = 16
-SubMenuButton.Font = Enum.Font.SourceSansBold
-SubMenuButton.Text = "≡"
-SubMenuButton.Parent = TitleBar
+local SettingsButton = Instance.new("TextButton", TitleBar)
+SettingsButton.Size = UDim2.new(0, 30, 0, 30)
+SettingsButton.Position = UDim2.new(1, -90, 0, 0)
+SettingsButton.Text = "⚙️"
+SettingsButton.Font = Enum.Font.SourceSansBold
+SettingsButton.TextColor3 = Color3.fromRGB(255,255,255)
+SettingsButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+SettingsButton.BackgroundTransparency = 1
+SettingsButton.TextSize = 16
 
--- Add UICorner for submenu button
-local SubMenuCorner = Instance.new("UICorner")
-SubMenuCorner.CornerRadius = UDim.new(0, 8)
-SubMenuCorner.Parent = SubMenuButton
-
--- Close Button
-local CloseButton = Instance.new("TextButton")
-CloseButton.Name = "CloseButton"
-CloseButton.Size = UDim2.new(0, 30, 0, 30)
-CloseButton.Position = UDim2.new(1, -30, 0, 0)
-CloseButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-CloseButton.BorderSizePixel = 0
-CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseButton.TextSize = 16
-CloseButton.Font = Enum.Font.SourceSansBold
-CloseButton.Text = "X"
-CloseButton.Parent = TitleBar
-
--- Add UICorner for close button
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 8)
-CloseCorner.Parent = CloseButton
-
--- Minimize Button
-local MinimizeButton = Instance.new("TextButton")
-MinimizeButton.Name = "MinimizeButton"
+local MinimizeButton = Instance.new("TextButton", TitleBar)
 MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
 MinimizeButton.Position = UDim2.new(1, -60, 0, 0)
-MinimizeButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-MinimizeButton.BorderSizePixel = 0
-MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinimizeButton.TextSize = 16
-MinimizeButton.Font = Enum.Font.SourceSansBold
 MinimizeButton.Text = "-"
-MinimizeButton.Parent = TitleBar
+MinimizeButton.Font = Enum.Font.SourceSansBold
+MinimizeButton.TextColor3 = Color3.fromRGB(255,255,255)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+MinimizeButton.BackgroundTransparency = 1
+MinimizeButton.TextSize = 20
 
--- Add UICorner for minimize button
-local MinimizeCorner = Instance.new("UICorner")
-MinimizeCorner.CornerRadius = UDim.new(0, 8)
-MinimizeCorner.Parent = MinimizeButton
+local CloseButton = Instance.new("TextButton", TitleBar)
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -30, 0, 0)
+CloseButton.Text = "×"
+CloseButton.Font = Enum.Font.SourceSansBold
+CloseButton.TextColor3 = Color3.fromRGB(255,255,255)
+CloseButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+CloseButton.BackgroundTransparency = 1
+CloseButton.TextSize = 20
 
--- Target Section (New Feature)
-local TargetSection = Instance.new("Frame")
-TargetSection.Name = "TargetSection"
-TargetSection.Size = UDim2.new(0.95, 0, 0, 120)
-TargetSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-TargetSection.BorderSizePixel = 0
-TargetSection.Parent = MainFrame
+-- Auth Frame
+local AuthFrame = Instance.new("Frame", MainFrame)
+AuthFrame.Size = UDim2.new(1, 0, 1, -30)
+AuthFrame.Position = UDim2.new(0, 0, 0, 30)
+AuthFrame.BackgroundColor3 = Color3.fromRGB(35,35,35)
 
--- Add UICorner for target section
-local TargetSectionCorner = Instance.new("UICorner")
-TargetSectionCorner.CornerRadius = UDim.new(0, 8)
-TargetSectionCorner.Parent = TargetSection
+local AuthTitle = Instance.new("TextLabel", AuthFrame)
+AuthTitle.Text = "Enter Access Key"
+AuthTitle.Font = Enum.Font.SourceSansBold
+AuthTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+AuthTitle.TextSize = 18
+AuthTitle.Position = UDim2.new(0.1, 0, 0.1, 0)
+AuthTitle.Size = UDim2.new(0.8, 0, 0, 30)
+AuthTitle.BackgroundTransparency = 1
 
-local TargetTitle = Instance.new("TextLabel")
-TargetTitle.Name = "TargetTitle"
-TargetTitle.Size = UDim2.new(1, 0, 0, 30)
-TargetTitle.BackgroundTransparency = 1
-TargetTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-TargetTitle.TextSize = 16
-TargetTitle.Font = Enum.Font.SourceSansBold
-TargetTitle.Text = "Target Selection"
-TargetTitle.Parent = TargetSection
+local KeyInput = Instance.new("TextBox", AuthFrame)
+KeyInput.PlaceholderText = "Enter Key..."
+KeyInput.Text = ""
+KeyInput.Font = Enum.Font.SourceSans
+KeyInput.TextSize = 16
+KeyInput.ClearTextOnFocus = false
+KeyInput.BackgroundColor3 = Color3.fromRGB(45,45,45)
+KeyInput.TextColor3 = Color3.fromRGB(255,255,255)
+KeyInput.Position = UDim2.new(0.1, 0, 0.3, 0)
+KeyInput.Size = UDim2.new(0.8, 0, 0, 35)
 
-local TargetDropdown = Instance.new("TextButton")
-TargetDropdown.Name = "TargetDropdown"
-TargetDropdown.Size = UDim2.new(0.6, 0, 0, 30)
-TargetDropdown.Position = UDim2.new(0.05, 0, 0, 35)
-TargetDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-TargetDropdown.BorderSizePixel = 0
-TargetDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-TargetDropdown.TextSize = 14
-TargetDropdown.Font = Enum.Font.SourceSans
-TargetDropdown.Text = "Select Target"
-TargetDropdown.Parent = TargetSection
+local KeyInputCorner = Instance.new("UICorner", KeyInput)
+KeyInputCorner.CornerRadius = UDim.new(0, 5)
 
--- Add UICorner for target dropdown
-local TargetDropdownCorner = Instance.new("UICorner")
-TargetDropdownCorner.CornerRadius = UDim.new(0, 6)
-TargetDropdownCorner.Parent = TargetDropdown
+local SubmitKey = Instance.new("TextButton", AuthFrame)
+SubmitKey.Text = "Submit"
+SubmitKey.Font = Enum.Font.SourceSansBold
+SubmitKey.TextSize = 16
+SubmitKey.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+SubmitKey.TextColor3 = Color3.fromRGB(255,255,255)
+SubmitKey.Size = UDim2.new(0.6, 0, 0, 35)
+SubmitKey.Position = UDim2.new(0.2, 0, 0.5, 0)
 
--- Reload Button
-local ReloadButton = Instance.new("TextButton")
-ReloadButton.Name = "ReloadButton"
-ReloadButton.Size = UDim2.new(0.25, 0, 0, 30)
-ReloadButton.Position = UDim2.new(0.7, 0, 0, 35)
-ReloadButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-ReloadButton.BorderSizePixel = 0
-ReloadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ReloadButton.TextSize = 14
-ReloadButton.Font = Enum.Font.SourceSans
-ReloadButton.Text = "Reload"
-ReloadButton.Parent = TargetSection
+local SubmitKeyCorner = Instance.new("UICorner", SubmitKey)
+SubmitKeyCorner.CornerRadius = UDim.new(0, 5)
 
--- Add UICorner for reload button
-local ReloadCorner = Instance.new("UICorner")
-ReloadCorner.CornerRadius = UDim.new(0, 6)
-ReloadCorner.Parent = ReloadButton
+-- Changed from key display to a note
+local KeyNote = Instance.new("TextLabel", AuthFrame)
+KeyNote.Name = "KeyNote"
+KeyNote.Size = UDim2.new(1, 0, 0, 30)
+KeyNote.Position = UDim2.new(0, 0, 0.7, 0)
+KeyNote.BackgroundTransparency = 1
+KeyNote.TextColor3 = Color3.fromRGB(200, 200, 200)
+KeyNote.TextSize = 14
+KeyNote.Font = Enum.Font.SourceSans
+KeyNote.Text = "Liên hệ admin để nhận key"
+KeyNote.TextXAlignment = Enum.TextXAlignment.Center
 
--- Follow Button (New Feature)
-local FollowButton = Instance.new("TextButton")
-FollowButton.Name = "FollowButton"
-FollowButton.Size = UDim2.new(0.45, 0, 0, 35)
-FollowButton.Position = UDim2.new(0.05, 0, 0, 75)
-FollowButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-FollowButton.BorderSizePixel = 0
-FollowButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-FollowButton.TextSize = 14
-FollowButton.Font = Enum.Font.SourceSansBold
-FollowButton.Text = "Follow: OFF"
-FollowButton.Parent = TargetSection
+-- Main Controls Frame
+local MainControls = Instance.new("Frame", MainFrame)
+MainControls.Size = UDim2.new(1, 0, 1, -30)
+MainControls.Position = UDim2.new(0, 0, 0, 30)
+MainControls.Visible = false
+MainControls.BackgroundColor3 = Color3.fromRGB(32,32,32)
+MainControls.ClipsDescendants = true
 
--- Add UICorner for follow button
-local FollowCorner = Instance.new("UICorner")
-FollowCorner.CornerRadius = UDim.new(0, 6)
-FollowCorner.Parent = FollowButton
+local ScrollingFrame = Instance.new("ScrollingFrame", MainControls)
+ScrollingFrame.Size = UDim2.new(1, -10, 1, -10)
+ScrollingFrame.Position = UDim2.new(0, 5, 0, 5)
+ScrollingFrame.BackgroundTransparency = 1
+ScrollingFrame.BorderSizePixel = 0
+ScrollingFrame.ScrollBarThickness = 4
+ScrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 800) -- Will adjust based on content
+ScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
--- Nearest Player Button (New Feature)
-local NearestPlayerButton = Instance.new("TextButton")
-NearestPlayerButton.Name = "NearestPlayerButton"
-NearestPlayerButton.Size = UDim2.new(0.45, 0, 0, 35)
-NearestPlayerButton.Position = UDim2.new(0.5, 0, 0, 75)
-NearestPlayerButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
-NearestPlayerButton.BorderSizePixel = 0
-NearestPlayerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-NearestPlayerButton.TextSize = 14
-NearestPlayerButton.Font = Enum.Font.SourceSansBold
-NearestPlayerButton.Text = "Select Nearest"
-NearestPlayerButton.Parent = TargetSection
+local UIListLayout = Instance.new("UIListLayout", ScrollingFrame)
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- Add UICorner for nearest player button
-local NearestPlayerCorner = Instance.new("UICorner")
-NearestPlayerCorner.CornerRadius = UDim.new(0, 6)
-NearestPlayerCorner.Parent = NearestPlayerButton
+-- Settings Frame
+local SettingsFrame = Instance.new("Frame", MainFrame)
+SettingsFrame.Size = UDim2.new(1, 0, 1, -30)
+SettingsFrame.Position = UDim2.new(0, 0, 0, 30)
+SettingsFrame.Visible = false
+SettingsFrame.BackgroundColor3 = Color3.fromRGB(32,32,32)
+SettingsFrame.ClipsDescendants = true
 
--- Function to select nearest player
-local function SelectNearestPlayer()
-    local closestPlayer = nil
-    local closestDistance = math.huge
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local distance = (HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-            if distance < closestDistance then
-                closestPlayer = player
-                closestDistance = distance
+local SettingsTitle = Instance.new("TextLabel", SettingsFrame)
+SettingsTitle.Text = "Settings"
+SettingsTitle.Font = Enum.Font.SourceSansBold
+SettingsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+SettingsTitle.TextSize = 18
+SettingsTitle.Position = UDim2.new(0, 0, 0, 5)
+SettingsTitle.Size = UDim2.new(1, 0, 0, 30)
+SettingsTitle.BackgroundTransparency = 1
+
+local SettingsTabs = Instance.new("Frame", SettingsFrame)
+SettingsTabs.Size = UDim2.new(1, 0, 0, 40)
+SettingsTabs.Position = UDim2.new(0, 0, 0, 35)
+SettingsTabs.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+
+local TabsLayout = Instance.new("UIListLayout", SettingsTabs)
+TabsLayout.FillDirection = Enum.FillDirection.Horizontal
+TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabsLayout.Padding = UDim.new(0, 2)
+
+-- Create tab buttons
+local SettingsPanels = {}
+for i, category in ipairs(SettingsCategories) do
+    local tabButton = Instance.new("TextButton", SettingsTabs)
+    tabButton.Text = category
+    tabButton.Font = Enum.Font.SourceSansSemibold
+    tabButton.TextSize = 14
+    tabButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    tabButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    tabButton.Size = UDim2.new(1/#SettingsCategories, -2, 1, 0)
+    tabButton.Name = category .. "Tab"
+    
+    local panel = Instance.new("ScrollingFrame", SettingsFrame)
+    panel.Size = UDim2.new(1, -20, 1, -85)
+    panel.Position = UDim2.new(0, 10, 0, 85)
+    panel.BackgroundTransparency = 1
+    panel.BorderSizePixel = 0
+    panel.ScrollBarThickness = 4
+    panel.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    panel.CanvasSize = UDim2.new(0, 0, 0, 500)
+    panel.Visible = i == 1 -- First panel visible by default
+    panel.Name = category .. "Panel"
+    
+    local panelLayout = Instance.new("UIListLayout", panel)
+    panelLayout.Padding = UDim.new(0, 10)
+    panelLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    SettingsPanels[category] = panel
+    
+    if i == 1 then
+        tabButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        tabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        CurrentPanel = category
+    end
+    
+    tabButton.MouseButton1Click:Connect(function()
+        -- Reset all tabs
+        for _, cat in ipairs(SettingsCategories) do
+            local tab = SettingsTabs:FindFirstChild(cat .. "Tab")
+            local pnl = SettingsFrame:FindFirstChild(cat .. "Panel")
+            if tab and pnl then
+                tab.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                tab.TextColor3 = Color3.fromRGB(200, 200, 200)
+                pnl.Visible = false
             end
         end
-    end
-
-    if closestPlayer then
-        TargetPlayer = closestPlayer
-        TargetDropdown.Text = closestPlayer.Name
-        CurrentTargetLabel.Text = "Current Target: " .. closestPlayer.Name
-    end
-end
-
--- Bind Nearest Player Button to SelectNearestPlayer function
-NearestPlayerButton.MouseButton1Click:Connect(SelectNearestPlayer)
-
--- Add all players to the dropdown list
-local function PopulatePlayerList()
-    -- Clear existing buttons
-    for _, child in pairs(PlayerScrollFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
-    end
-
-    -- Clear player list
-    PlayerList = {}
-
-    -- Add all players except local player
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            table.insert(PlayerList, player)
-            
-            local playerButton = Instance.new("TextButton")
-            playerButton.Name = player.Name .. "Button"
-            playerButton.Size = UDim2.new(0.9, 0, 0, 30)
-            playerButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-            playerButton.BorderSizePixel = 0
-            playerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-            playerButton.TextSize = 14
-            playerButton.Font = Enum.Font.SourceSans
-            playerButton.Text = player.Name
-            playerButton.ZIndex = 12
-            playerButton.Parent = PlayerScrollFrame
-            
-            -- Add UICorner for player button
-            local playerButtonCorner = Instance.new("UICorner")
-            playerButtonCorner.CornerRadius = UDim.new(0, 4)
-            playerButtonCorner.Parent = playerButton
-            
-            playerButton.MouseButton1Click:Connect(function()
-                TargetPlayer = player
-                TargetDropdown.Text = player.Name
-                DropdownFrame.Visible = false
-                
-                -- Also set as look target
-                LookTarget = player
-                CurrentTargetLabel.Text = "Current Target: " .. player.Name
-            end)
-        end
-    end
-
-    -- Update canvas size based on number of players
-    local contentHeight = #PlayerList * 35
-    PlayerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
-end
-
--- Update player list when needed
-ReloadButton.MouseButton1Click:Connect(PopulatePlayerList)
-
--- Automatically check for players' expiration
-local function CheckExpiration()
-    local currentTime = os.time()
-    local expirationTime = os.time({
-        year = EXPIRATION_DATE.Year,
-        month = EXPIRATION_DATE.Month,
-        day = EXPIRATION_DATE.Day,
-        hour = EXPIRATION_DATE.Hour,
-        min = EXPIRATION_DATE.Minute,
-        sec = EXPIRATION_DATE.Second
-    })
-
-    local timeLeft = expirationTime - currentTime
-
-    if timeLeft <= 0 then
-        -- Script has expired
-        AuthFrame.Visible = false
-        FeaturesFrame.Visible = false
-        ExpiredFrame.Visible = true
-        return true
-    else
-        -- Calculate time left
-        local days = math.floor(timeLeft / 86400)
-        local hours = math.floor((timeLeft % 86400) / 3600)
-        local minutes = math.floor((timeLeft % 3600) / 60)
-        local seconds = timeLeft % 60
         
-        ExpirationLabel.Text = string.format("Expires in: %d days, %02d:%02d:%02d", days, hours, minutes, seconds)
-        return false
-    end
-end
-
--- Start rainbow border effect
-local function StartRainbowEffect()
-    local colors = {
-        Color3.fromRGB(255, 0, 0),    -- Red
-        Color3.fromRGB(255, 165, 0),  -- Orange
-        Color3.fromRGB(255, 255, 0),  -- Yellow
-        Color3.fromRGB(0, 255, 0),    -- Green
-        Color3.fromRGB(0, 0, 255),    -- Blue
-        Color3.fromRGB(75, 0, 130),   -- Indigo
-        Color3.fromRGB(238, 130, 238) -- Violet
-    }
-
-    local index = 1
-
-    spawn(function()
-        while ScreenGui.Parent do
-            local targetColor = colors[index]
-            local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
-            
-            local mainTween = TweenService:Create(MainStroke, tweenInfo, {Color = targetColor})
-            mainTween:Play()
-            
-            index = (index % #colors) + 1
-            wait(0.5)
-        end
+        -- Activate selected tab
+        tabButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        tabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        panel.Visible = true
+        CurrentPanel = category
+        
+        createRippleEffect(tabButton)
     end)
 end
 
--- Call the start rainbow effect function
-StartRainbowEffect()
+local BackButton = Instance.new("TextButton", SettingsFrame)
+BackButton.Text = "Back to Main"
+BackButton.Font = Enum.Font.SourceSansBold
+BackButton.TextSize = 14
+BackButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+BackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BackButton.Size = UDim2.new(0.4, 0, 0, 30)
+BackButton.Position = UDim2.new(0.05, 0, 1, -40)
 
+local BackButtonCorner = Instance.new("UICorner", BackButton)
+BackButtonCorner.CornerRadius = UDim.new(0, 5)
+
+local SaveButton = Instance.new("TextButton", SettingsFrame)
+SaveButton.Text = "Save Settings"
+SaveButton.Font = Enum.Font.SourceSansBold
+SaveButton.TextSize = 14
+SaveButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+SaveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SaveButton.Size = UDim2.new(0.4, 0, 0, 30)
+SaveButton.Position = UDim2.new(0.55, 0, 1, -40)
+
+local SaveButtonCorner = Instance.new("UICorner", SaveButton)
+SaveButtonCorner.CornerRadius = UDim.new(0, 5)
+
+-- Minimize Icon GUI
+local IconFrame = Instance.new("ImageButton", ScreenGui)
+IconFrame.Size = IconSize
+IconFrame.Position = UDim2.new(0, 20, 0.5, -20)
+IconFrame.BackgroundTransparency = 1
+IconFrame.Image = IconURL
+IconFrame.Visible = false
+IconFrame.Draggable = IconDraggable
+
+-- SubMenu Frame (Hidden by default)
+local SubMenuFrame = Instance.new("Frame", ScreenGui)
+SubMenuFrame.Name = "SubMenuFrame"
+SubMenuFrame.Size = UDim2.new(0, 250, 0, 300)
+SubMenuFrame.Position = UDim2.new(0.5, 175, 0.5, -150)
+SubMenuFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+SubMenuFrame.BorderSizePixel = 0
+SubMenuFrame.Visible = false
+SubMenuFrame.Active = true
+SubMenuFrame.Draggable = true -- Enable built-in dragging
+
+-- Add UICorner for submenu frame
+local SubMenuCorner = Instance.new("UICorner", SubMenuFrame)
+SubMenuCorner.CornerRadius = UDim.new(0, 8)
+
+-- Add UIStroke for submenu frame
+local SubMenuStroke = Instance.new("UIStroke", SubMenuFrame)
+SubMenuStroke.Thickness = 2
+SubMenuStroke.Color = Color3.fromRGB(255, 0, 0)
+SubMenuStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- SubMenu Title Bar
+local SubMenuTitleBar = Instance.new("Frame", SubMenuFrame)
+SubMenuTitleBar.Name = "SubMenuTitleBar"
+SubMenuTitleBar.Size = UDim2.new(1, 0, 0, 30)
+SubMenuTitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+SubMenuTitleBar.BorderSizePixel = 0
+
+-- Add UICorner for submenu title bar
+local SubMenuTitleCorner = Instance.new("UICorner", SubMenuTitleBar)
+SubMenuTitleCorner.CornerRadius = UDim.new(0, 8)
+
+-- SubMenu Title
+local SubMenuTitle = Instance.new("TextLabel", SubMenuTitleBar)
+SubMenuTitle.Name = "SubMenuTitle"
+SubMenuTitle.Size = UDim2.new(1, -40, 1, 0)
+SubMenuTitle.Position = UDim2.new(0, 10, 0, 0)
+SubMenuTitle.BackgroundTransparency = 1
+SubMenuTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubMenuTitle.TextSize = 16
+SubMenuTitle.Font = Enum.Font.SourceSansBold
+SubMenuTitle.Text = "Safety Settings"
+SubMenuTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+-- SubMenu Close Button
+local SubMenuCloseButton = Instance.new("TextButton", SubMenuTitleBar)
+SubMenuCloseButton.Name = "SubMenuCloseButton"
+SubMenuCloseButton.Size = UDim2.new(0, 30, 0, 30)
+SubMenuCloseButton.Position = UDim2.new(1, -30, 0, 0)
+SubMenuCloseButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+SubMenuCloseButton.BorderSizePixel = 0
+SubMenuCloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubMenuCloseButton.TextSize = 16
+SubMenuCloseButton.Font = Enum.Font.SourceSansBold
+SubMenuCloseButton.Text = "X"
+
+-- Add UICorner for submenu close button
+local SubMenuCloseCorner = Instance.new("UICorner", SubMenuCloseButton)
+SubMenuCloseCorner.CornerRadius = UDim.new(0, 8)
+
+-- SubMenu Content
+local SubMenuContent = Instance.new("Frame", SubMenuFrame)
+SubMenuContent.Name = "SubMenuContent"
+SubMenuContent.Size = UDim2.new(1, 0, 1, -30)
+SubMenuContent.Position = UDim2.new(0, 0, 0, 30)
+SubMenuContent.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+SubMenuContent.BorderSizePixel = 0
+
+-- Auto Check Position Toggle
+local AutoCheckLabel = Instance.new("TextLabel", SubMenuContent)
+AutoCheckLabel.Name = "AutoCheckLabel"
+AutoCheckLabel.Size = UDim2.new(0.7, 0, 0, 30)
+AutoCheckLabel.Position = UDim2.new(0.05, 0, 0, 10)
+AutoCheckLabel.BackgroundTransparency = 1
+AutoCheckLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoCheckLabel.TextSize = 14
+AutoCheckLabel.Font = Enum.Font.SourceSansBold
+AutoCheckLabel.Text = "Auto Check Position:"
+AutoCheckLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local AutoCheckButton = Instance.new("TextButton", SubMenuContent)
+AutoCheckButton.Name = "AutoCheckButton"
+AutoCheckButton.Size = UDim2.new(0.2, 0, 0, 30)
+AutoCheckButton.Position = UDim2.new(0.75, 0, 0, 10)
+AutoCheckButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+AutoCheckButton.BorderSizePixel = 0
+AutoCheckButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoCheckButton.TextSize = 14
+AutoCheckButton.Font = Enum.Font.SourceSansBold
+AutoCheckButton.Text = "OFF"
+
+-- Add UICorner for auto check button
+local AutoCheckCorner = Instance.new("UICorner", AutoCheckButton)
+AutoCheckCorner.CornerRadius = UDim.new(0, 6)
+
+-- Safe Position Vertical Min
+local VerticalMinLabel = Instance.new("TextLabel", SubMenuContent)
+VerticalMinLabel.Name = "VerticalMinLabel"
+VerticalMinLabel.Size = UDim2.new(0.5, 0, 0, 30)
+VerticalMinLabel.Position = UDim2.new(0.05, 0, 0, 50)
+VerticalMinLabel.BackgroundTransparency = 1
+VerticalMinLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalMinLabel.TextSize = 14
+VerticalMinLabel.Font = Enum.Font.SourceSans
+VerticalMinLabel.Text = "Vertical Min (Y):"
+VerticalMinLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local VerticalMinInput = Instance.new("TextBox", SubMenuContent)
+VerticalMinInput.Name = "VerticalMinInput"
+VerticalMinInput.Size = UDim2.new(0.3, 0, 0, 30)
+VerticalMinInput.Position = UDim2.new(0.65, 0, 0, 50)
+VerticalMinInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+VerticalMinInput.BorderSizePixel = 0
+VerticalMinInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalMinInput.TextSize = 14
+VerticalMinInput.Font = Enum.Font.SourceSans
+VerticalMinInput.Text = "-1000"
+
+-- Add UICorner for vertical min input
+local VerticalMinCorner = Instance.new("UICorner", VerticalMinInput)
+VerticalMinCorner.CornerRadius = UDim.new(0, 6)
+
+-- Safe Position Vertical Max
+local VerticalMaxLabel = Instance.new("TextLabel", SubMenuContent)
+VerticalMaxLabel.Name = "VerticalMaxLabel"
+VerticalMaxLabel.Size = UDim2.new(0.5, 0, 0, 30)
+VerticalMaxLabel.Position = UDim2.new(0.05, 0, 0, 90)
+VerticalMaxLabel.BackgroundTransparency = 1
+VerticalMaxLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalMaxLabel.TextSize = 14
+VerticalMaxLabel.Font = Enum.Font.SourceSans
+VerticalMaxLabel.Text = "Vertical Max (Y):"
+VerticalMaxLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local VerticalMaxInput = Instance.new("TextBox", SubMenuContent)
+VerticalMaxInput.Name = "VerticalMaxInput"
+VerticalMaxInput.Size = UDim2.new(0.3, 0, 0, 30)
+VerticalMaxInput.Position = UDim2.new(0.65, 0, 0, 90)
+VerticalMaxInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+VerticalMaxInput.BorderSizePixel = 0
+VerticalMaxInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalMaxInput.TextSize = 14
+VerticalMaxInput.Font = Enum.Font.SourceSans
+VerticalMaxInput.Text = "1000"
+
+-- Add UICorner for vertical max input
+local VerticalMaxCorner = Instance.new("UICorner", VerticalMaxInput)
+VerticalMaxCorner.CornerRadius = UDim.new(0, 6)
+
+-- Safe Position Horizontal Min
+local HorizontalMinLabel = Instance.new("TextLabel", SubMenuContent)
+HorizontalMinLabel.Name = "HorizontalMinLabel"
+HorizontalMinLabel.Size = UDim2.new(0.5, 0, 0, 30)
+HorizontalMinLabel.Position = UDim2.new(0.05, 0, 0, 130)
+HorizontalMinLabel.BackgroundTransparency = 1
+HorizontalMinLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalMinLabel.TextSize = 14
+HorizontalMinLabel.Font = Enum.Font.SourceSans
+HorizontalMinLabel.Text = "Horizontal Min (X/Z):"
+HorizontalMinLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local HorizontalMinInput = Instance.new("TextBox", SubMenuContent)
+HorizontalMinInput.Name = "HorizontalMinInput"
+HorizontalMinInput.Size = UDim2.new(0.3, 0, 0, 30)
+HorizontalMinInput.Position = UDim2.new(0.65, 0, 0, 130)
+HorizontalMinInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+HorizontalMinInput.BorderSizePixel = 0
+HorizontalMinInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalMinInput.TextSize = 14
+HorizontalMinInput.Font = Enum.Font.SourceSans
+HorizontalMinInput.Text = "-1000"
+
+-- Add UICorner for horizontal min input
+local HorizontalMinCorner = Instance.new("UICorner", HorizontalMinInput)
+HorizontalMinCorner.CornerRadius = UDim.new(0, 6)
+
+-- Safe Position Horizontal Max
+local HorizontalMaxLabel = Instance.new("TextLabel", SubMenuContent)
+HorizontalMaxLabel.Name = "HorizontalMaxLabel"
+HorizontalMaxLabel.Size = UDim2.new(0.5, 0, 0, 30)
+HorizontalMaxLabel.Position = UDim2.new(0.05, 0, 0, 170)
+HorizontalMaxLabel.BackgroundTransparency = 1
+HorizontalMaxLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalMaxLabel.TextSize = 14
+HorizontalMaxLabel.Font = Enum.Font.SourceSans
+HorizontalMaxLabel.Text = "Horizontal Max (X/Z):"
+HorizontalMaxLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local HorizontalMaxInput = Instance.new("TextBox", SubMenuContent)
+HorizontalMaxInput.Name = "HorizontalMaxInput"
+HorizontalMaxInput.Size = UDim2.new(0.3, 0, 0, 30)
+HorizontalMaxInput.Position = UDim2.new(0.65, 0, 0, 170)
+HorizontalMaxInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+HorizontalMaxInput.BorderSizePixel = 0
+HorizontalMaxInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalMaxInput.TextSize = 14
+HorizontalMaxInput.Font = Enum.Font.SourceSans
+HorizontalMaxInput.Text = "1000"
+
+-- Add UICorner for horizontal max input
+local HorizontalMaxCorner = Instance.new("UICorner", HorizontalMaxInput)
+HorizontalMaxCorner.CornerRadius = UDim.new(0, 6)
+
+-- Apply Settings Button
+local ApplySettingsButton = Instance.new("TextButton", SubMenuContent)
+ApplySettingsButton.Name = "ApplySettingsButton"
+ApplySettingsButton.Size = UDim2.new(0.9, 0, 0, 40)
+ApplySettingsButton.Position = UDim2.new(0.05, 0, 0, 220)
+ApplySettingsButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+ApplySettingsButton.BorderSizePixel = 0
+ApplySettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ApplySettingsButton.TextSize = 16
+ApplySettingsButton.Font = Enum.Font.SourceSansBold
+ApplySettingsButton.Text = "Apply Settings"
+
+-- Add UICorner for apply settings button
+local ApplySettingsCorner = Instance.new("UICorner", ApplySettingsButton)
+ApplySettingsCorner.CornerRadius = UDim.new(0, 6)
+
+-- Create section headers and controls for each settings panel
+local function createSettingSection(panel, title, layoutOrder)
+    local section = Instance.new("Frame", panel)
+    section.Size = UDim2.new(1, 0, 0, 30)
+    section.BackgroundTransparency = 1
+    section.LayoutOrder = layoutOrder
+    
+    local sectionTitle = Instance.new("TextLabel", section)
+    sectionTitle.Text = title
+    sectionTitle.Font = Enum.Font.SourceSansBold
+    sectionTitle.TextSize = 16
+    sectionTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    sectionTitle.Size = UDim2.new(1, 0, 1, 0)
+    sectionTitle.BackgroundTransparency = 1
+    sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+    
+    return section
+end
+
+local function createToggle(panel, text, initialState, callback, layoutOrder)
+    local toggle = Instance.new("Frame", panel)
+    toggle.Size = UDim2.new(1, 0, 0, 30)
+    toggle.BackgroundTransparency = 1
+    toggle.LayoutOrder = layoutOrder
+    
+    local label = Instance.new("TextLabel", toggle)
+    label.Text = text
+    label.Font = Enum.Font.SourceSans
+    label.TextSize = 14
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local button = Instance.new("TextButton", toggle)
+    button.Text = initialState and "ON" or "OFF"
+    button.Font = Enum.Font.SourceSansBold
+    button.TextSize = 14
+    button.BackgroundColor3 = initialState and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Size = UDim2.new(0.25, 0, 1, 0)
+    button.Position = UDim2.new(0.75, 0, 0, 0)
+    
+    local buttonCorner = Instance.new("UICorner", button)
+    buttonCorner.CornerRadius = UDim.new(0, 5)
+    
+    local state = initialState
+    
+    button.MouseButton1Click:Connect(function()
+        state = not state
+        button.Text = state and "ON" or "OFF"
+        button.BackgroundColor3 = state and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+        
+        if callback then
+            callback(state)
+        end
+        
+        createRippleEffect(button)
+    end)
+    
+    return toggle, button
+end
+
+local function createSlider(panel, text, min, max, initialValue, callback, layoutOrder)
+    local sliderFrame = Instance.new("Frame", panel)
+    sliderFrame.Size = UDim2.new(1, 0, 0, 50)
+    sliderFrame.BackgroundTransparency = 1
+    sliderFrame.LayoutOrder = layoutOrder
+    
+    local label = Instance.new("TextLabel", sliderFrame)
+    label.Text = text .. ": " .. initialValue
+    label.Font = Enum.Font.SourceSans
+    label.TextSize = 14
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local sliderBg = Instance.new("Frame", sliderFrame)
+    sliderBg.Size = UDim2.new(1, 0, 0, 10)
+    sliderBg.Position = UDim2.new(0, 0, 0.6, 0)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    
+    local sliderBgCorner = Instance.new("UICorner", sliderBg)
+    sliderBgCorner.CornerRadius = UDim.new(0, 5)
+    
+    local sliderFill = Instance.new("Frame", sliderBg)
+    sliderFill.Size = UDim2.new((initialValue - min) / (max - min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+    
+    local sliderFillCorner = Instance.new("UICorner", sliderFill)
+    sliderFillCorner.CornerRadius = UDim.new(0, 5)
+    
+    local sliderButton = Instance.new("TextButton", sliderBg)
+    sliderButton.Text = ""
+    sliderButton.Size = UDim2.new(1, 0, 1, 0)
+    sliderButton.BackgroundTransparency = 1
+    
+    local value = initialValue
+    
+    local function updateSlider(input)
+        local pos = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        local newValue = math.floor(min + (max - min) * pos)
+        
+        value = newValue
+        sliderFill.Size = UDim2.new(pos, 0, 1, 0)
+        label.Text = text .. ": " .. value
+        
+        if callback then
+            callback(value)
+        end
+    end
+    
+    sliderButton.MouseButton1Down:Connect(function(x, y)
+        local input = {Position = Vector2.new(x, y)}
+        updateSlider(input)
+        
+        local connection
+        connection = UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                updateSlider(input)
+            end
+        end)
+        
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if connection then
+                    connection:Disconnect()
+                    connection = nil
+                end
+            end
+        end)
+    end)
+    
+    return sliderFrame, value
+end
+
+local function createTextInput(panel, text, initialValue, callback, layoutOrder)
+    local inputFrame = Instance.new("Frame", panel)
+    inputFrame.Size = UDim2.new(1, 0, 0, 50)
+    inputFrame.BackgroundTransparency = 1
+    inputFrame.LayoutOrder = layoutOrder
+    
+    local label = Instance.new("TextLabel", inputFrame)
+    label.Text = text
+    label.Font = Enum.Font.SourceSans
+    label.TextSize = 14
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local input = Instance.new("TextBox", inputFrame)
+    input.PlaceholderText = "Enter value..."
+    input.Text = initialValue or ""
+    input.Font = Enum.Font.SourceSans
+    input.TextSize = 14
+    input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    input.Size = UDim2.new(1, 0, 0, 30)
+    input.Position = UDim2.new(0, 0, 0.4, 0)
+    input.ClearTextOnFocus = false
+    
+    local inputCorner = Instance.new("UICorner", input)
+    inputCorner.CornerRadius = UDim.new(0, 5)
+    
+    input.FocusLost:Connect(function(enterPressed)
+        if callback then
+            callback(input.Text, enterPressed)
+        end
+    end)
+    
+    return inputFrame, input
+end
+
+local function createColorPicker(panel, text, initialColor, callback, layoutOrder)
+    local colorFrame = Instance.new("Frame", panel)
+    colorFrame.Size = UDim2.new(1, 0, 0, 70)
+    colorFrame.BackgroundTransparency = 1
+    colorFrame.LayoutOrder = layoutOrder
+    
+    local label = Instance.new("TextLabel", colorFrame)
+    label.Text = text
+    label.Font = Enum.Font.SourceSans
+    label.TextSize = 14
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local colorDisplay = Instance.new("Frame", colorFrame)
+    colorDisplay.Size = UDim2.new(0.2, 0, 0, 30)
+    colorDisplay.Position = UDim2.new(0, 0, 0.4, 0)
+    colorDisplay.BackgroundColor3 = initialColor or Color3.fromRGB(255, 255, 255)
+    
+    local colorDisplayCorner = Instance.new("UICorner", colorDisplay)
+    colorDisplayCorner.CornerRadius = UDim.new(0, 5)
+    
+    local hexInput = Instance.new("TextBox", colorFrame)
+    hexInput.PlaceholderText = "Hex: #RRGGBB"
+    hexInput.Text = "#" .. string.format("%02X%02X%02X", 
+        math.floor(initialColor.R * 255), 
+        math.floor(initialColor.G * 255), 
+        math.floor(initialColor.B * 255))
+    hexInput.Font = Enum.Font.SourceSans
+    hexInput.TextSize = 14
+    hexInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    hexInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    hexInput.Size = UDim2.new(0.35, 0, 0, 30)
+    hexInput.Position = UDim2.new(0.22, 0, 0.4, 0)
+    hexInput.ClearTextOnFocus = false
+    
+    local hexInputCorner = Instance.new("UICorner", hexInput)
+    hexInputCorner.CornerRadius = UDim.new(0, 5)
+    
+    local rgbInput = Instance.new("TextBox", colorFrame)
+    rgbInput.PlaceholderText = "RGB: R,G,B"
+    rgbInput.Text = string.format("%d,%d,%d", 
+        math.floor(initialColor.R * 255), 
+        math.floor(initialColor.G * 255), 
+        math.floor(initialColor.B * 255))
+    rgbInput.Font = Enum.Font.SourceSans
+    rgbInput.TextSize = 14
+    rgbInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    rgbInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    rgbInput.Size = UDim2.new(0.4, 0, 0, 30)
+    rgbInput.Position = UDim2.new(0.6, 0, 0.4, 0)
+    rgbInput.ClearTextOnFocus = false
+    
+    local rgbInputCorner = Instance.new("UICorner", rgbInput)
+    rgbInputCorner.CornerRadius = UDim.new(0, 5)
+    
+    local currentColor = initialColor
+    
+    hexInput.FocusLost:Connect(function()
+        local hex = hexInput.Text
+        if string.sub(hex, 1, 1) == "#" then
+            hex = string.sub(hex, 2)
+        end
+        
+        if string.len(hex) == 6 then
+            local r = tonumber(string.sub(hex, 1, 2), 16) or 255
+            local g = tonumber(string.sub(hex, 3, 4), 16) or 255
+            local b = tonumber(string.sub(hex, 5, 6), 16) or 255
+            
+            currentColor = Color3.fromRGB(r, g, b)
+            colorDisplay.BackgroundColor3 = currentColor
+            rgbInput.Text = string.format("%d,%d,%d", r, g, b)
+            
+            if callback then
+                callback(currentColor)
+            end
+        end
+    end)
+    
+    rgbInput.FocusLost:Connect(function()
+        local r, g, b = rgbInput.Text:match("(%d+),(%d+),(%d+)")
+        
+        if r and g and b then
+            r, g, b = tonumber(r), tonumber(g), tonumber(b)
+            if r <= 255 and g <= 255 and b <= 255 then
+                currentColor = Color3.fromRGB(r, g, b)
+                colorDisplay.BackgroundColor3 = currentColor
+                hexInput.Text = "#" .. string.format("%02X%02X%02X", r, g, b)
+                
+                if callback then
+                    callback(currentColor)
+                end
+            end
+        end
+    end)
+    
+    return colorFrame, currentColor
+end
+
+local function createDropdown(panel, text, options, initialOption, callback, layoutOrder)
+    local dropdownFrame = Instance.new("Frame", panel)
+    dropdownFrame.Size = UDim2.new(1, 0, 0, 60)
+    dropdownFrame.BackgroundTransparency = 1
+    dropdownFrame.LayoutOrder = layoutOrder
+    
+    local label = Instance.new("TextLabel", dropdownFrame)
+    label.Text = text
+    label.Font = Enum.Font.SourceSans
+    label.TextSize = 14
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local dropdownButton = Instance.new("TextButton", dropdownFrame)
+    dropdownButton.Text = initialOption or options[1]
+    dropdownButton.Font = Enum.Font.SourceSans
+    dropdownButton.TextSize = 14
+    dropdownButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    dropdownButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    dropdownButton.Size = UDim2.new(1, 0, 0, 30)
+    dropdownButton.Position = UDim2.new(0, 0, 0.5, 0)
+    
+    local dropdownButtonCorner = Instance.new("UICorner", dropdownButton)
+    dropdownButtonCorner.CornerRadius = UDim.new(0, 5)
+    
+    local dropdownMenu = Instance.new("Frame", dropdownFrame)
+    dropdownMenu.Size = UDim2.new(1, 0, 0, #options * 30)
+    dropdownMenu.Position = UDim2.new(0, 0, 1, 5)
+    dropdownMenu.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    dropdownMenu.Visible = false
+    dropdownMenu.ZIndex = 10
+    
+    local dropdownMenuCorner = Instance.new("UICorner", dropdownMenu)
+    dropdownMenuCorner.CornerRadius = UDim.new(0, 5)
+    
+    local dropdownLayout = Instance.new("UIListLayout", dropdownMenu)
+    dropdownLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    for i, option in ipairs(options) do
+        local optionButton = Instance.new("TextButton", dropdownMenu)
+        optionButton.Text = option
+        optionButton.Font = Enum.Font.SourceSans
+        optionButton.TextSize = 14
+        optionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        optionButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        optionButton.BackgroundTransparency = 0.5
+        optionButton.Size = UDim2.new(1, 0, 0, 30)
+        optionButton.ZIndex = 10
+        
+        optionButton.MouseButton1Click:Connect(function()
+            dropdownButton.Text = option
+            dropdownMenu.Visible = false
+            
+            if callback then
+                callback(option)
+            end
+            
+            createRippleEffect(optionButton)
+        end)
+    end
+    
+    dropdownButton.MouseButton1Click:Connect(function()
+        dropdownMenu.Visible = not dropdownMenu.Visible
+        createRippleEffect(dropdownButton)
+    end)
+    
+    return dropdownFrame, dropdownButton
+end
+
+local function createButton(panel, text, callback, color, layoutOrder)
+    local buttonFrame = Instance.new("Frame", panel)
+    buttonFrame.Size = UDim2.new(1, 0, 0, 40)
+    buttonFrame.BackgroundTransparency = 1
+    buttonFrame.LayoutOrder = layoutOrder
+    
+    local button = Instance.new("TextButton", buttonFrame)
+    button.Text = text
+    button.Font = Enum.Font.SourceSansBold
+    button.TextSize = 14
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.BackgroundColor3 = color or Color3.fromRGB(0, 120, 215)
+    button.Size = UDim2.new(1, 0, 1, 0)
+    
+    local buttonCorner = Instance.new("UICorner", button)
+    buttonCorner.CornerRadius = UDim.new(0, 5)
+    
+    button.MouseButton1Click:Connect(function()
+        if callback then
+            callback()
+        end
+        
+        createRippleEffect(button)
+    end)
+    
+    return buttonFrame, button
+end
+
+-- Populate Display Settings Panel
+local displayPanel = SettingsPanels["Display"]
+
+createSettingSection(displayPanel, "Name Display Settings", 1)
+
+createToggle(displayPanel, "Show Player Names", ShowExpName, function(state)
+    ShowExpName = state
+end, 2)
+
+createToggle(displayPanel, "Show HP Values", ShowHP, function(state)
+    ShowHP = state
+end, 3)
+
+createToggle(displayPanel, "X-Ray Vision (See Through Walls)", AllowWallDisplay, function(state)
+    AllowWallDisplay = state
+end, 4)
+
+createSlider(displayPanel, "Font Size", 8, 24, DisplayFontSize, function(value)
+    DisplayFontSize = value
+end, 5)
+
+createColorPicker(displayPanel, "Text Color", DisplayColor, function(color)
+    DisplayColor = color
+end, 6)
+
+createDropdown(displayPanel, "Display Mode", {"name", "distance", "hp"}, DisplayMode, function(option)
+    DisplayMode = option
+end, 7)
+
+-- Populate Targeting Settings Panel
+local targetingPanel = SettingsPanels["Targeting"]
+
+createSettingSection(targetingPanel, "Target Selection", 1)
+
+createSlider(targetingPanel, "Detection Radius", 5, 100, DetectionRadius, function(value)
+    DetectionRadius = value
+end, 2)
+
+createToggle(targetingPanel, "Auto-Next Target", AutoNextTarget, function(state)
+    AutoNextTarget = state
+end, 3)
+
+createDropdown(targetingPanel, "Look At Body Part", BodyParts, LookBodyPart, function(option)
+    LookBodyPart = option
+    for i, part in ipairs(BodyParts) do
+        if part == option then
+            BodyPartIndex = i
+            break
+        end
+    end
+end, 4)
+
+-- Populate Movement Settings Panel
+local movementPanel = SettingsPanels["Movement"]
+
+createSettingSection(movementPanel, "Follow Settings", 1)
+
+createToggle(movementPanel, "Follow Target", FollowingTarget, function(state)
+    FollowingTarget = state
+end, 2)
+
+createSlider(movementPanel, "Distance Behind", 1, 20, DistanceBehind, function(value)
+    DistanceBehind = value
+end, 3)
+
+createSlider(movementPanel, "Height Offset", -5, 10, DistanceAbove, function(value)
+    DistanceAbove = value
+end, 4)
+
+-- Populate Appearance Settings Panel
+local appearancePanel = SettingsPanels["Appearance"]
+
+createSettingSection(appearancePanel, "Icon Settings", 1)
+
+createTextInput(appearancePanel, "Icon URL", IconURL, function(value)
+    IconURL = value
+    IconFrame.Image = value
+end, 2)
+
+createToggle(appearancePanel, "Icon Draggable", IconDraggable, function(state)
+    IconDraggable = state
+    IconFrame.Draggable = state
+end, 3)
+
+createTextInput(appearancePanel, "Icon Size X", tostring(IconSize.X.Offset), function(value)
+    local size = tonumber(value)
+    if size then
+        IconSize = UDim2.  function(value)
+    local size = tonumber(value)
+    if size then
+        IconSize = UDim2.new(0, size, 0, IconSize.Y.Offset)
+        IconFrame.Size = IconSize
+    end
+end, 4)
+
+createTextInput(appearancePanel, "Icon Size Y", tostring(IconSize.Y.Offset), function(value)
+    local size = tonumber(value)
+    if size then
+        IconSize = UDim2.new(0, IconSize.X.Offset, 0, size)
+        IconFrame.Size = IconSize
+    end
+end, 5)
+
+-- Populate Advanced Settings Panel
+local advancedPanel = SettingsPanels["Advanced"]
+
+createSettingSection(advancedPanel, "Admin Settings", 1)
+
+local adminPassInput, adminPassBox = createTextInput(advancedPanel, "Admin Password", "", function(value)
+    if value == ADMIN_PASSWORD then
+        AdminAuthenticated = true
+        adminPassBox.Text = "Authenticated!"
+        adminPassBox.TextColor3 = Color3.fromRGB(0, 255, 0)
+    else
+        AdminAuthenticated = false
+        adminPassBox.TextColor3 = Color3.fromRGB(255, 0, 0)
+    end
+end, 2)
+
+createButton(advancedPanel, "Apply VIP Icon", function()
+    if AdminAuthenticated then
+        IconURL = "https://i.postimg.cc/jqH5FgNg/1747049246632.webp"
+        IconFrame.Image = IconURL
+    end
+end, Color3.fromRGB(255, 165, 0), 3)
+
+createButton(advancedPanel, "Reset All Settings", function()
+    if AdminAuthenticated then
+        -- Reset to defaults
+        DisplayFontSize = 14
+        DisplayMode = "name"
+        DisplayColor = Color3.fromRGB(255,255,255)
+        AllowWallDisplay = false
+        ShowExpName = true
+        ShowHP = true
+        IconSize = UDim2.new(0, 40, 0, 40)
+        IconDraggable = false
+        IconURL = "rbxassetid://7072719455"
+        DistanceBehind = 5
+        DistanceAbove = 0
+        DetectionRadius = 20
+        
+        -- Update UI
+        IconFrame.Size = IconSize
+        IconFrame.Image = IconURL
+        IconFrame.Draggable = IconDraggable
+    end
+end, Color3.fromRGB(200, 50, 50), 4)
+
+-- Player List Section for Main Controls
+local TargetSection = Instance.new("Frame", ScrollingFrame)
+TargetSection.Size = UDim2.new(0.9, 0, 0, 150)
+TargetSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+TargetSection.LayoutOrder = 1
+
+local TargetSectionCorner = Instance.new("UICorner", TargetSection)
+TargetSectionCorner.CornerRadius = UDim.new(0, 8)
+
+local TargetTitle = Instance.new("TextLabel", TargetSection)
+TargetTitle.Text = "Target Selection"
+TargetTitle.Font = Enum.Font.SourceSansBold
+TargetTitle.TextSize = 16
+TargetTitle.TextColor3 = Color3.fromRGB(255,255,255)
+TargetTitle.Position = UDim2.new(0.05, 0, 0.03, 0)
+TargetTitle.Size = UDim2.new(0.9, 0, 0, 25)
+TargetTitle.BackgroundTransparency = 1
+
+local TargetDropdown = Instance.new("TextButton", TargetSection)
+TargetDropdown.Text = "Select Target"
+TargetDropdown.Font = Enum.Font.SourceSans
+TargetDropdown.TextSize = 14
+TargetDropdown.BackgroundColor3 = Color3.fromRGB(55,55,55)
+TargetDropdown.TextColor3 = Color3.fromRGB(255,255,255)
+TargetDropdown.Position = UDim2.new(0.05, 0, 0.25, 0)
+TargetDropdown.Size = UDim2.new(0.55, 0, 0, 30)
+
+local TargetDropdownCorner = Instance.new("UICorner", TargetDropdown)
+TargetDropdownCorner.CornerRadius = UDim.new(0, 5)
+
+local ReloadButton = Instance.new("TextButton", TargetSection)
+ReloadButton.Text = "Reload"
+ReloadButton.Font = Enum.Font.SourceSans
+ReloadButton.TextSize = 14
+ReloadButton.BackgroundColor3 = Color3.fromRGB(70,70,70)
+ReloadButton.TextColor3 = Color3.fromRGB(255,255,255)
+ReloadButton.Position = UDim2.new(0.63, 0, 0.25, 0)
+ReloadButton.Size = UDim2.new(0.3, 0, 0, 30)
+
+local ReloadButtonCorner = Instance.new("UICorner", ReloadButton)
+ReloadButtonCorner.CornerRadius = UDim.new(0, 5)
+
+local NearestButton = Instance.new("TextButton", TargetSection)
+NearestButton.Text = "Select Nearest"
+NearestButton.Font = Enum.Font.SourceSansBold
+NearestButton.TextSize = 14
+NearestButton.BackgroundColor3 = Color3.fromRGB(255,165,0)
+NearestButton.TextColor3 = Color3.fromRGB(255,255,255)
+NearestButton.Position = UDim2.new(0.05, 0, 0.5, 0)
+NearestButton.Size = UDim2.new(0.9, 0, 0, 30)
+
+local NearestButtonCorner = Instance.new("UICorner", NearestButton)
+NearestButtonCorner.CornerRadius = UDim.new(0, 5)
+
+-- Action Buttons Section
+local ActionSection = Instance.new("Frame", ScrollingFrame)
+ActionSection.Size = UDim2.new(0.9, 0, 0, 200)
+ActionSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ActionSection.LayoutOrder = 2
+
+local ActionSectionCorner = Instance.new("UICorner", ActionSection)
+ActionSectionCorner.CornerRadius = UDim.new(0, 8)
+
+local ActionTitle = Instance.new("TextLabel", ActionSection)
+ActionTitle.Text = "Actions"
+ActionTitle.Font = Enum.Font.SourceSansBold
+ActionTitle.TextSize = 16
+ActionTitle.TextColor3 = Color3.fromRGB(255,255,255)
+ActionTitle.Position = UDim2.new(0.05, 0, 0.03, 0)
+ActionTitle.Size = UDim2.new(0.9, 0, 0, 25)
+ActionTitle.BackgroundTransparency = 1
+
+-- Follow Button
+local FollowButton = Instance.new("TextButton", ActionSection)
+FollowButton.Text = "Follow: OFF"
+FollowButton.Font = Enum.Font.SourceSansBold
+FollowButton.TextSize = 14
+FollowButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+FollowButton.TextColor3 = Color3.fromRGB(255,255,255)
+FollowButton.Position = UDim2.new(0.05, 0, 0.2, 0)
+FollowButton.Size = UDim2.new(0.9, 0, 0, 30)
+
+local FollowButtonCorner = Instance.new("UICorner", FollowButton)
+FollowButtonCorner.CornerRadius = UDim.new(0, 5)
+
+-- Auto Next Toggle
+local AutoNextButton = Instance.new("TextButton", ActionSection)
+AutoNextButton.Text = "Auto Next: OFF"
+AutoNextButton.Font = Enum.Font.SourceSansBold
+AutoNextButton.TextSize = 14
+AutoNextButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+AutoNextButton.TextColor3 = Color3.fromRGB(255,255,255)
+AutoNextButton.Position = UDim2.new(0.05, 0, 0.35, 0)
+AutoNextButton.Size = UDim2.new(0.9, 0, 0, 30)
+
+local AutoNextButtonCorner = Instance.new("UICorner", AutoNextButton)
+AutoNextButtonCorner.CornerRadius = UDim.new(0, 5)
+
+-- Look At Button
+local LookAtButton = Instance.new("TextButton", ActionSection)
+LookAtButton.Text = "Look At (Head)"
+LookAtButton.Font = Enum.Font.SourceSansBold
+LookAtButton.TextSize = 14
+LookAtButton.BackgroundColor3 = Color3.fromRGB(80, 80, 255)
+LookAtButton.TextColor3 = Color3.fromRGB(255,255,255)
+LookAtButton.Position = UDim2.new(0.05, 0, 0.5, 0)
+LookAtButton.Size = UDim2.new(0.9, 0, 0, 30)
+
+local LookAtButtonCorner = Instance.new("UICorner", LookAtButton)
+LookAtButtonCorner.CornerRadius = UDim.new(0, 5)
+
+-- Teleport Behind
+local TeleportButton = Instance.new("TextButton", ActionSection)
+TeleportButton.Text = "Teleport Behind"
+TeleportButton.Font = Enum.Font.SourceSansBold
+TeleportButton.TextSize = 14
+TeleportButton.BackgroundColor3 = Color3.fromRGB(60, 180, 75)
+TeleportButton.TextColor3 = Color3.fromRGB(255,255,255)
+TeleportButton.Position = UDim2.new(0.05, 0, 0.65, 0)
+TeleportButton.Size = UDim2.new(0.9, 0, 0, 30)
+
+local TeleportButtonCorner = Instance.new("UICorner", TeleportButton)
+TeleportButtonCorner.CornerRadius = UDim.new(0, 5)
+
+-- Advanced Features Section
+local AdvancedSection = Instance.new("Frame", ScrollingFrame)
+AdvancedSection.Size = UDim2.new(0.9, 0, 0, 150)
+AdvancedSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+AdvancedSection.LayoutOrder = 3
+
+local AdvancedSectionCorner = Instance.new("UICorner", AdvancedSection)
+AdvancedSectionCorner.CornerRadius = UDim.new(0, 8)
+
+local AdvancedTitle = Instance.new("TextLabel", AdvancedSection)
+AdvancedTitle.Text = "Advanced Features"
+AdvancedTitle.Font = Enum.Font.SourceSansBold
+AdvancedTitle.TextSize = 16
+AdvancedTitle.TextColor3 = Color3.fromRGB(255,255,255)
+AdvancedTitle.Position = UDim2.new(0.05, 0, 0.03, 0)
+AdvancedTitle.Size = UDim2.new(0.9, 0, 0, 25)
+AdvancedTitle.BackgroundTransparency = 1
+
+-- NoClip Button
+local NoClipButton = Instance.new("TextButton", AdvancedSection)
+NoClipButton.Text = "NoClip: OFF"
+NoClipButton.Font = Enum.Font.SourceSansBold
+NoClipButton.TextSize = 14
+NoClipButton.BackgroundColor3 = Color3.fromRGB(150, 65, 200)
+NoClipButton.TextColor3 = Color3.fromRGB(255,255,255)
+NoClipButton.Position = UDim2.new(0.05, 0, 0.25, 0)
+NoClipButton.Size = UDim2.new(0.9, 0, 0, 30)
+
+local NoClipButtonCorner = Instance.new("UICorner", NoClipButton)
+NoClipButtonCorner.CornerRadius = UDim.new(0, 5)
+
+-- Auto Platform Button
+local PlatformButton = Instance.new("TextButton", AdvancedSection)
+PlatformButton.Text = "Auto Platform: OFF"
+PlatformButton.Font = Enum.Font.SourceSansBold
+PlatformButton.TextSize = 14
+PlatformButton.BackgroundColor3 = Color3.fromRGB(200, 130, 0)
+PlatformButton.TextColor3 = Color3.fromRGB(255,255,255)
+PlatformButton.Position = UDim2.new(0.05, 0, 0.5, 0)
+PlatformButton.Size = UDim2.new(0.9, 0, 0, 30)
+
+local PlatformButtonCorner = Instance.new("UICorner", PlatformButton)
+PlatformButtonCorner.CornerRadius = UDim.new(0, 5)
+
+-- Run Away Button
+local RunAwayButton = Instance.new("TextButton", AdvancedSection)
+RunAwayButton.Text = "Run Away"
+RunAwayButton.Font = Enum.Font.SourceSansBold
+RunAwayButton.TextSize = 14
+RunAwayButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+RunAwayButton.TextColor3 = Color3.fromRGB(255,255,255)
+RunAwayButton.Position = UDim2.new(0.05, 0, 0.75, 0)
+RunAwayButton.Size = UDim2.new(0.9, 0, 0, 30)
+
+local RunAwayButtonCorner = Instance.new("UICorner", RunAwayButton)
+RunAwayButtonCorner.CornerRadius = UDim.new(0, 5)
+
+-- Storage for Billboards
+local nameBillboards = {}
+
+-- Function Definitions
+local function populatePlayerList()
+    PlayerList = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(PlayerList, p)
+        end
+    end
+end
+
+local function createBillboard(player)
+    if nameBillboards[player] then return end
+    
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ExpName"
+    billboard.Adornee = player.Character and player.Character:FindFirstChild("Head")
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.AlwaysOnTop = true
+    
+    local textLabel = Instance.new("TextLabel", billboard)
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = DisplayColor
+    textLabel.TextStrokeTransparency = 0.5
+    textLabel.TextSize = DisplayFontSize
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.Text = ""
+    textLabel.Name = "Label"
+    
+    billboard.Parent = player.Character:FindFirstChild("Head")
+    nameBillboards[player] = billboard
+end
+
+local function createPlatform()
+    if AutoPlatform then
+        local platform = Instance.new("Part")
+        platform.Size = Vector3.new(6, 1, 6)
+        platform.Anchored = true
+        platform.Transparency = 0.5
+        platform.BrickColor = BrickColor.new("Bright blue")
+        platform.CanCollide = true
+        platform.Name = "AutoPlatform"
+        
+        -- Position the platform below the player
+        platform.CFrame = HumanoidRootPart.CFrame * CFrame.new(0, -3.5, 0)
+        platform.Parent = workspace
+        
+        -- Remove the platform after a short delay
+        spawn(function()
+            wait(1)
+            platform:Destroy()
+        end)
+    end
+end
+
+-- Function to find the nearest player
+local function GetNearestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (player.Character.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance then
+                closestPlayer = player
+                shortestDistance = distance
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- Toggle look at player function
+local function ToggleLookAtPlayer()
+    LookingAtPlayer = not LookingAtPlayer
+    
+    if LookingAtPlayer then
+        LookAtButton.Text = "Look At: ON"
+        LookAtButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        
+        -- Create look at connection
+        local lookConnection = RunService.RenderStepped:Connect(function()
+            if LookingAtPlayer and LookTarget and LookTarget.Character and LookTarget.Character:FindFirstChild(LookBodyPart) and Camera then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, LookTarget.Character[LookBodyPart].Position)
+            end
+        end)
+        
+        -- Store connection
+        LookAtButton.LookConnection = lookConnection
+    else
+        LookAtButton.Text = "Look At: OFF"
+        LookAtButton.BackgroundColor3 = Color3.fromRGB(80, 80, 255)
+        
+        -- Disconnect look connection
+        if LookAtButton.LookConnection then
+            LookAtButton.LookConnection:Disconnect()
+            LookAtButton.LookConnection = nil
+        end
+    end
+end
+
+-- Toggle auto check position
+local function ToggleAutoCheckPosition()
+    AutoCheckPosition = not AutoCheckPosition
+
+    if AutoCheckPosition then
+        AutoCheckButton.Text = "ON"
+        AutoCheckButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        
+        -- Get safe position boundaries
+        local verticalMin = tonumber(VerticalMinInput.Text) or -1000
+        local verticalMax = tonumber(VerticalMaxInput.Text) or 1000
+        local horizontalMin = tonumber(HorizontalMinInput.Text) or -1000
+        local horizontalMax = tonumber(HorizontalMaxInput.Text) or 1000
+        
+        SafePositionMin = Vector3.new(horizontalMin, verticalMin, horizontalMin)
+        SafePositionMax = Vector3.new(horizontalMax, verticalMax, horizontalMax)
+        
+        -- Auto check loop
+        local checkConnection = RunService.Heartbeat:Connect(function()
+            if AutoCheckPosition and Character and Character:FindFirstChild("HumanoidRootPart") then
+                local pos = HumanoidRootPart.Position
+                local lastSafePosition = HumanoidRootPart.CFrame
+                
+                -- Check if position is outside safe boundaries
+                if pos.Y < SafePositionMin.Y or pos.Y > SafePositionMax.Y or
+                   pos.X < SafePositionMin.X or pos.X > SafePositionMax.X or
+                   pos.Z < SafePositionMin.Z or pos.Z > SafePositionMax.Z then
+                    
+                    -- If we have a saved position, teleport to it
+                    if SavedPosition then
+                        HumanoidRootPart.CFrame = SavedPosition
+                    else
+                        -- Otherwise, try to move back to a safe position
+                        local safeY = math.clamp(pos.Y, SafePositionMin.Y, SafePositionMax.Y)
+                        local safeX = math.clamp(pos.X, SafePositionMin.X, SafePositionMax.X)
+                        local safeZ = math.clamp(pos.Z, SafePositionMin.Z, SafePositionMax.Z)
+                        
+                        HumanoidRootPart.CFrame = CFrame.new(safeX, safeY, safeZ, HumanoidRootPart.CFrame:GetComponents())
+                    end
+                else
+                    -- Update last safe position
+                    AutoCheckButton.LastSafePosition = lastSafePosition
+                end
+            end
+        end)
+        
+        -- Store connection
+        AutoCheckButton.CheckConnection = checkConnection
+    else
+        AutoCheckButton.Text = "OFF"
+        AutoCheckButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        
+        -- Disconnect auto check loop
+        if AutoCheckButton.CheckConnection then
+            AutoCheckButton.CheckConnection:Disconnect()
+            AutoCheckButton.CheckConnection = nil
+        end
+    end
+end
+
+-- Toggle submenu
+local function ToggleSubMenu()
+    SubMenuVisible = not SubMenuVisible
+    SubMenuFrame.Visible = SubMenuVisible
+end
+
+-- Event Connections
+SubmitKey.MouseButton1Click:Connect(function()
+    if KeyInput.Text == KEY then
+        if isExpired() then
+            AuthTitle.Text = "Script expired!"
+            SubmitKey.Text = "No access"
+            return
+        end
+        
+        Authenticated = true
+        AuthFrame.Visible = false
+        MainControls.Visible = true
+        
+        -- Initial population of player list
+        populatePlayerList()
+        
+        -- Load saved settings if available
+        loadSettings()
+    else
+        AuthTitle.Text = "Wrong key. Try again."
+        createTween(AuthTitle, {TextColor3 = Color3.fromRGB(255, 50, 50)}, 0.3):Play()
+        wait(0.5)
+        createTween(AuthTitle, {TextColor3 = Color3.fromRGB(255, 255, 255)}, 0.3):Play()
+    end
+    
+    createRippleEffect(SubmitKey)
+end)
+
+ReloadButton.MouseButton1Click:Connect(function()
+    populatePlayerList()
+    createRippleEffect(ReloadButton)
+end)
+
+NearestButton.MouseButton1Click:Connect(function()
+    local nearest = GetNearestPlayer()
+    if nearest then
+        TargetPlayer = nearest
+        LookTarget = nearest
+        TargetDropdown.Text = nearest.Name
+    end
+    createRippleEffect(NearestButton)
+end)
+
+TargetDropdown.MouseButton1Click:Connect(function()
+    populatePlayerList()
+    
+    -- Remove existing dropdown menu if it exists
+    local existingMenu = MainControls:FindFirstChild("DropdownMenu")
+    if existingMenu then
+        existingMenu:Destroy()
+    end
+    
+    local menu = Instance.new("Frame", MainControls)
+    menu.Size = UDim2.new(0.55, 0, 0, math.min(#PlayerList * 30, 150))
+    menu.Position = UDim2.new(0.05, 0, 0.17, 0)
+    menu.BackgroundColor3 = Color3.fromRGB(45,45,45)
+    menu.BorderSizePixel = 0
+    menu.Name = "DropdownMenu"
+    menu.ZIndex = 10
+    menu.ClipsDescendants = true
+    
+    local menuCorner = Instance.new("UICorner", menu)
+    menuCorner.CornerRadius = UDim.new(0, 5)
+    
+    local scrollFrame = Instance.new("ScrollingFrame", menu)
+    scrollFrame.Size = UDim2.new(1, 0, 1, 0)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 4
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, #PlayerList * 30)
+    scrollFrame.ZIndex = 10
+    
+    local layout = Instance.new("UIListLayout", scrollFrame)
+    layout.Padding = UDim.new(0, 2)
+    
+    for _, p in pairs(PlayerList) do
+        local btn = Instance.new("TextButton", scrollFrame)
+        btn.Size = UDim2.new(1, -8, 0, 28)
+        btn.Text = p.Name
+        btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        btn.TextColor3 = Color3.fromRGB(255,255,255)
+        btn.Font = Enum.Font.SourceSans
+        btn.TextSize = 14
+        btn.ZIndex = 10
+        
+        local btnCorner = Instance.new("UICorner", btn)
+        btnCorner.CornerRadius = UDim.new(0, 4)
+        
+        btn.MouseButton1Click:Connect(function()
+            TargetPlayer = p
+            LookTarget = p
+            TargetDropdown.Text = p.Name
+            menu:Destroy()
+            createRippleEffect(btn)
+        end)
+    end
+    
+    createRippleEffect(TargetDropdown)
+end)
+
+FollowButton.MouseButton1Click:Connect(function()
+    FollowingTarget = not FollowingTarget
+    
+    if FollowingTarget then
+        if not TargetPlayer or not TargetPlayer.Character then
+            FollowingTarget = false
+            return
+        end
+        
+        FollowButton.Text = "Follow: ON"
+        FollowButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        
+        -- Follow loop
+        local followConnection = RunService.Heartbeat:Connect(function()
+            if FollowingTarget and TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") and Character and Character:FindFirstChild("HumanoidRootPart") then
+                local targetHRP = TargetPlayer.Character.HumanoidRootPart
+                local targetHumanoid = TargetPlayer.Character:FindFirstChild("Humanoid")
+                
+                -- Check if target is dead and auto next is enabled
+                if AutoNextTarget and targetHumanoid and targetHumanoid.Health <= 0 then
+                    -- Find next target
+                    local foundNext = false
+                    for _, player in pairs(PlayerList) do
+                        if player ~= TargetPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+                            TargetPlayer = player
+                            TargetDropdown.Text = player.Name
+                            foundNext = true
+                            break
+                        end
+                    end
+                    
+                    if not foundNext then
+                        FollowingTarget = false
+                        FollowButton.Text = "Follow: OFF"
+                        FollowButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+                        followConnection:Disconnect()
+                    end
+                else
+                    -- Calculate position behind target
+                    local targetLookVector = targetHRP.CFrame.LookVector
+                    local behindPosition = targetHRP.Position - (targetLookVector * DistanceBehind)
+                    behindPosition = behindPosition + Vector3.new(0, DistanceAbove, 0)
+                    
+                    -- Teleport behind target
+                    HumanoidRootPart.CFrame = CFrame.new(behindPosition, targetHRP.Position)
+                end
+            end
+        end)
+        
+        -- Store connection
+        FollowButton.FollowConnection = followConnection
+    else
+        FollowButton.Text = "Follow: OFF"
+        FollowButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        
+        -- Disconnect follow loop
+        if FollowButton.FollowConnection then
+            FollowButton.FollowConnection:Disconnect()
+            FollowButton.FollowConnection = nil
+        end
+    end
+    
+    createRippleEffect(FollowButton)
+end)
+
+AutoNextButton.MouseButton1Click:Connect(function()
+    AutoNextTarget = not AutoNextTarget
+    AutoNextButton.Text = "Auto Next: " .. (AutoNextTarget and "ON" or "OFF")
+    AutoNextButton.BackgroundColor3 = AutoNextTarget and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(100, 100, 100)
+    createRippleEffect(AutoNextButton)
+end)
+
+LookAtButton.MouseButton1Click:Connect(function()
+    ToggleLookAtPlayer()
+    createRippleEffect(LookAtButton)
+end)
+
+TeleportButton.MouseButton1Click:Connect(function()
+    if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local targetPart = TargetPlayer.Character.HumanoidRootPart
+        local backVec = -targetPart.CFrame.LookVector * DistanceBehind + Vector3.new(0, DistanceAbove, 0)
+        HumanoidRootPart.CFrame = CFrame.new(targetPart.Position + backVec, targetPart.Position)
+    end
+    createRippleEffect(TeleportButton)
+end)
+
+NoClipButton.MouseButton1Click:Connect(function()
+    NoClipping = not NoClipping
+    NoClipButton.Text = "NoClip: " .. (NoClipping and "ON" or "OFF")
+    NoClipButton.BackgroundColor3 = NoClipping and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(150, 65, 200)
+    
+    if NoClipping then
+        -- Enable noclip
+        local noclipConnection = RunService.Stepped:Connect(function()
+            if Character and NoClipping then
+                for _, part in pairs(Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+        
+        -- Store the connection
+        NoClipButton.NoclipConnection = noclipConnection
+    else
+        -- Disable noclip
+        if NoClipButton.NoclipConnection then
+            NoClipButton.NoclipConnection:Disconnect()
+            NoClipButton.NoclipConnection = nil
+        end
+        
+        -- Reset collision
+        for _, part in pairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+    
+    createRippleEffect(NoClipButton)
+end)
+
+PlatformButton.MouseButton1Click:Connect(function()
+    AutoPlatform = not AutoPlatform
+    PlatformButton.Text = "Auto Platform: " .. (AutoPlatform and "ON" or "OFF")
+    PlatformButton.BackgroundColor3 = AutoPlatform and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(200, 130, 0)
+    
+    if AutoPlatform then
+        -- Create platform
+        local platform = Instance.new("Part")
+        platform.Name = "ExecutorPlatform"
+        platform.Size = Vector3.new(5, 1, 5)
+        platform.Anchored = true
+        platform.CanCollide = true
+        platform.Transparency = 0.5
+        platform.Material = Enum.Material.Neon
+        platform.Color = Color3.fromRGB(0, 120, 255)
+        platform.Parent = workspace
+        
+        -- Platform update loop
+        local platformConnection = RunService.Heartbeat:Connect(function()
+            if AutoPlatform and Character and Character:FindFirstChild("HumanoidRootPart") then
+                platform.CFrame = CFrame.new(HumanoidRootPart.Position.X, HumanoidRootPart.Position.Y - 3.5, HumanoidRootPart.Position.Z)
+            end
+        end)
+        
+        -- Store references
+        PlatformButton.Platform = platform
+        PlatformButton.PlatformConnection = platformConnection
+    else
+        -- Remove platform
+        if PlatformButton.Platform and PlatformButton.Platform:IsDescendantOf(workspace) then
+            PlatformButton.Platform:Destroy()
+            PlatformButton.Platform = nil
+        end
+        
+        -- Disconnect update loop
+        if PlatformButton.PlatformConnection then
+            PlatformButton.PlatformConnection:Disconnect()
+            PlatformButton.PlatformConnection = nil
+        end
+    end
+    
+    createRippleEffect(PlatformButton)
+end)
+
+RunAwayButton.MouseButton1Click:Connect(function()
+    if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local targetPos = TargetPlayer.Character.HumanoidRootPart.Position
+        local playerPos = HumanoidRootPart.Position
+        local direction = (playerPos - targetPos).Unit
+        local runPos = playerPos + direction * 50
+        
+        -- Teleport away from target
+        HumanoidRootPart.CFrame = CFrame.new(runPos, targetPos)
+    end
+    createRippleEffect(RunAwayButton)
+end)
+
+SettingsButton.MouseButton1Click:Connect(function()
+    MainControls.Visible = false
+    SettingsFrame.Visible = true
+    createRippleEffect(SettingsButton)
+end)
+
+BackButton.MouseButton1Click:Connect(function()
+    SettingsFrame.Visible = false
+    MainControls.Visible = true
+    createRippleEffect(BackButton)
+end)
+
+SaveButton.MouseButton1Click:Connect(function()
+    saveSettings()
+    createRippleEffect(SaveButton)
+    
+    -- Visual feedback
+    SaveButton.Text = "Saved!"
+    wait(1)
+    SaveButton.Text = "Save Settings"
+end)
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    IconFrame.Visible = true
+    Minimized = true
+end)
+
+IconFrame.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    IconFrame.Visible = false
+    Minimized = false
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+SubMenuCloseButton.MouseButton1Click:Connect(function()
+    SubMenuFrame.Visible = false
+    SubMenuVisible = false
+end)
+
+AutoCheckButton.MouseButton1Click:Connect(function()
+    ToggleAutoCheckPosition()
+end)
+
+ApplySettingsButton.MouseButton1Click:Connect(function()
+    -- Get values from inputs
+    local verticalMin = tonumber(VerticalMinInput.Text) or -1000
+    local verticalMax = tonumber(VerticalMaxInput.Text) or 1000
+    local horizontalMin = tonumber(HorizontalMinInput.Text) or -1000
+    local horizontalMax = tonumber(HorizontalMaxInput.Text) or 1000
+
+    -- Update safe position boundaries
+    SafePositionMin = Vector3.new(horizontalMin, verticalMin, horizontalMin)
+    SafePositionMax = Vector3.new(horizontalMax, verticalMax, horizontalMax)
+
+    -- Show confirmation message
+    local confirmMsg = Instance.new("TextLabel")
+    confirmMsg.Size = UDim2.new(0.9, 0, 0, 20)
+    confirmMsg.Position = UDim2.new(0.05, 0, 0, 270)
+    confirmMsg.BackgroundTransparency = 1
+    confirmMsg.TextColor3 = Color3.fromRGB(0, 255, 0)
+    confirmMsg.TextSize = 12
+    confirmMsg.Font = Enum.Font.SourceSans
+    confirmMsg.Text = "Settings applied!"
+    confirmMsg.Parent = SubMenuContent
+
+    -- Remove after 2 seconds
+    task.delay(2, function()
+        confirmMsg:Destroy()
+    end)
+
+    -- If auto check is on, restart it with new settings
+    if AutoCheckPosition then
+        if AutoCheckButton.CheckConnection then
+            AutoCheckButton.CheckConnection:Disconnect()
+            AutoCheckButton.CheckConnection = nil
+        end
+        ToggleAutoCheckPosition()
+        ToggleAutoCheckPosition()
+    end
+    
+    createRippleEffect(ApplySettingsButton)
+end)
+
+-- Continuous Update Functions
+RunService.RenderStepped:Connect(function()
+    -- Update Billboard content
+    if Authenticated then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+                if ShowExpName then
+                    createBillboard(p)
+                    local label = nameBillboards[p] and nameBillboards[p]:FindFirstChild("Label")
+                    if label then
+                        local text = ""
+                        if DisplayMode == "name" then
+                            text = p.Name
+                        elseif DisplayMode == "distance" and p.Character:FindFirstChild("HumanoidRootPart") then
+                            local dist = (HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                            text = string.format("%.1f m", dist)
+                        elseif DisplayMode == "hp" and p.Character:FindFirstChild("Humanoid") then
+                            text = string.format("HP: %d", math.floor(p.Character.Humanoid.Health))
+                        end
+                        
+                        if ShowHP and p.Character:FindFirstChild("Humanoid") and DisplayMode ~= "hp" then
+                            text = text .. " | HP: " .. math.floor(p.Character.Humanoid.Health)
+                        end
+                        
+                        label.Text = text
+                        label.TextColor3 = DisplayColor
+                        label.TextSize = DisplayFontSize
+                        nameBillboards[p].Adornee = p.Character.Head
+                        nameBillboards[p].AlwaysOnTop = AllowWallDisplay
+                    end
+                elseif nameBillboards[p] then
+                    nameBillboards[p]:Destroy()
+                    nameBillboards[p] = nil
+                end
+            end
+        end
+    end
+    
+    -- Auto Platform Logic
+    if Authenticated and AutoPlatform and Character and Character:FindFirstChild("Humanoid") then
+        if Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+            createPlatform()
+        end
+    end
+end)
+
+-- Auto Next Target on death
+RunService.Stepped:Connect(function()
+    if Authenticated and AutoNextTarget and TargetPlayer then
+        local hum = TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Humanoid")
+        if not hum or hum.Health <= 0 then
+            local nextTarget = nil
+            local minDist = math.huge
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p ~= TargetPlayer and p.Character and p.Character:FindFirstChild("Humanoid") then
+                    if p.Character.Humanoid.Health > 0 then
+                        local dist = (HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            nextTarget = p
+                        end
+                    end
+                end
+            end
+            if nextTarget then
+                TargetPlayer = nextTarget
+                LookTarget = nextTarget
+                TargetDropdown.Text = nextTarget.Name
+            end
+        end
+    end
+end)
+
+-- Rainbow border effect
+local rainbowColors = {
+    Color3.fromRGB(255, 0, 0),
+    Color3.fromRGB(255, 165, 0),
+    Color3.fromRGB(255, 255, 0),
+    Color3.fromRGB(0, 255, 0),
+    Color3.fromRGB(0, 0, 255),
+    Color3.fromRGB(75, 0, 130),
+    Color3.fromRGB(238, 130, 238)
+}
+local rainbowIndex = 1
+
+spawn(function()
+    while MainFrame and MainFrame.Parent do
+        local nextColor = rainbowColors[rainbowIndex]
+        local tween = TweenService:Create(UIStroke, TweenInfo.new(0.5), {Color = nextColor})
+        local iconTween = TweenService:Create(SubMenuStroke, TweenInfo.new(0.5), {Color = nextColor})
+        
+        tween:Play()
+        iconTween:Play()
+        
+        rainbowIndex = (rainbowIndex % #rainbowColors) + 1
+        wait(0.5)
+    end
+end)
+
+-- Reset icon on respawn
+LocalPlayer.CharacterAdded:Connect(function(char)
+    wait(1)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
+    
+    -- Reset states if needed
+    if NoClipping then
+        if NoClipButton.NoclipConnection then
+            NoClipButton.NoclipConnection:Disconnect()
+            NoClipButton.NoclipConnection = nil
+        end
+        NoClipping = false
+        NoClipButton.Text = "NoClip: OFF"
+        NoClipButton.BackgroundColor3 = Color3.fromRGB(150, 65, 200)
+    end
+    
+    if FollowingTarget then
+        if FollowButton.FollowConnection then
+            FollowButton.FollowConnection:Disconnect()
+            FollowButton.FollowConnection = nil
+        end
+        FollowingTarget = false
+        FollowButton.Text = "Follow: OFF"
+        FollowButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+    end
+    
+    if LookingAtPlayer then
+        if LookAtButton.LookConnection then
+            LookAtButton.LookConnection:Disconnect()
+            LookAtButton.LookConnection = nil
+        }
+        LookingAtPlayer = false
+        LookAtButton.Text = "Look At: OFF"
+        LookAtButton.BackgroundColor3 = Color3.fromRGB(80, 80, 255)
+    end
+end)
+
+-- Load settings on startup
+loadSettings()
