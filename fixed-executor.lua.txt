@@ -1073,7 +1073,7 @@ local ESPSizeCorner = Instance.new("UICorner")
 ESPSizeCorner.CornerRadius = UDim.new(0, 6)
 ESPSizeCorner.Parent = ESPSizeInput
 
--- ESP Through Walls Toggle
+-- ESP Through Walls Toggle (Fixed)
 local ESPWallsToggle = Instance.new("TextButton")
 ESPWallsToggle.Name = "ESPWallsToggle"
 ESPWallsToggle.Size = UDim2.new(0.45, 0, 0, 35)
@@ -1081,8 +1081,6 @@ ESPWallsToggle.Position = UDim2.new(0.05, 0, 0, 125)
 ESPWallsToggle.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
 ESPWallsToggle.BorderSizePixel = 0
 ESPWallsToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-ESPWallsToggle.TextSize = 14
-ESPWallsToggle.Font = Enum.Font.SourceSan255,255)
 ESPWallsToggle.TextSize = 14
 ESPWallsToggle.Font = Enum.Font.SourceSansBold
 ESPWallsToggle.Text = "Through Walls: ON"
