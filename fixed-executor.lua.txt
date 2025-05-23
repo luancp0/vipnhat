@@ -1,0 +1,2633 @@
+-- Roblox Executor Script (Enhanced Version)
+-- Features: Draggable GUI, Minimize, Close, Player Targeting, Teleport, Noclip, Distance Adjustment, Auto Platform, Position Saving
+
+-- Configuration (EDIT THESE VALUES)
+local KEY = "123456" -- Change this to your desired key
+local VIP_ICON_URL = "https://i.postimg.cc/jqH5FgNg/1747049246632.webp"
+local VIP_ICON_PASSWORD = "987654321"
+local EXPIRATION_DATE = {
+    Year = 2025,
+    Month = 20,
+    Day = 0,
+    Hour = 0,
+    Minute = 0,
+    Second = 0
+}
+
+-- Services
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+-- Variables
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local Camera = workspace.CurrentCamera
+
+-- State Variables
+local NoClipping = false
+local Authenticated = false
+local Minimized = false
+local AutoPlatform = false
+local RunningAway = false
+local FollowingTarget = false
+local AutoNextTarget = false
+local AutoCheckPosition = false
+local SubMenuVisible = false
+local LookingAtPlayer = false
+local LookTarget = nil
+local LookBodyPart = "Head"
+local BodyParts = {"Head", "UpperTorso", "HumanoidRootPart", "LeftFoot", "RightFoot"}
+local BodyPartIndex = 1
+local MiniIconDraggable = false
+local AutoAFKEnabled = false
+local AutoReconnectEnabled = false
+local ESPEnabled = true
+local ESPType = "name"
+local ESPTextColor = Color3.new(1,1,1)
+local ESPTextSize = 16
+local ESPAlwaysOnTop = true
+local ESPDistanceLimit = 99999
+local ESPThroughWalls = true
+local ESPShowDistance = false
+local ESPShowHPBool = false
+local ESPObjects = {}
+local PlatformPart = nil
+
+-- Distance Settings
+local DistanceBehind = 5
+local DistanceAbove = 0
+local DetectionRadius = 20
+
+-- Safe Position Boundaries
+local SafePositionMin = Vector3.new(-1000, -1000, -1000)
+local SafePositionMax = Vector3.new(1000, 1000, 1000)
+
+-- Saved Position
+local SavedPosition = nil
+
+-- Target Variables
+local TargetPlayer = nil
+local PlayerList = {}
+
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ExecutorGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 350, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+-- Add UICorner for rounded corners
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
+
+-- Add UIStroke for rainbow border
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Thickness = 2
+MainStroke.Color = Color3.fromRGB(255, 0, 0)
+MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+MainStroke.Parent = MainFrame
+
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+-- Add UICorner for title bar
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(1, -90, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = "Roblox Executor"
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+-- SubMenu Button
+local SubMenuButton = Instance.new("TextButton")
+SubMenuButton.Name = "SubMenuButton"
+SubMenuButton.Size = UDim2.new(0, 30, 0, 30)
+SubMenuButton.Position = UDim2.new(1, -90, 0, 0)
+SubMenuButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+SubMenuButton.BorderSizePixel = 0
+SubMenuButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubMenuButton.TextSize = 16
+SubMenuButton.Font = Enum.Font.SourceSansBold
+SubMenuButton.Text = "≡"
+SubMenuButton.Parent = TitleBar
+
+-- Add UICorner for submenu button
+local SubMenuCorner = Instance.new("UICorner")
+SubMenuCorner.CornerRadius = UDim.new(0, 8)
+SubMenuCorner.Parent = SubMenuButton
+
+-- Close Button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseButton"
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -30, 0, 0)
+CloseButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+CloseButton.BorderSizePixel = 0
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 16
+CloseButton.Font = Enum.Font.SourceSansBold
+CloseButton.Text = "X"
+CloseButton.Parent = TitleBar
+
+-- Add UICorner for close button
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 8)
+CloseCorner.Parent = CloseButton
+
+-- Minimize Button
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Name = "MinimizeButton"
+MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
+MinimizeButton.Position = UDim2.new(1, -60, 0, 0)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.TextSize = 16
+MinimizeButton.Font = Enum.Font.SourceSansBold
+MinimizeButton.Text = "-"
+MinimizeButton.Parent = TitleBar
+
+-- Add UICorner for minimize button
+local MinimizeCorner = Instance.new("UICorner")
+MinimizeCorner.CornerRadius = UDim.new(0, 8)
+MinimizeCorner.Parent = MinimizeButton
+
+-- Content Frame
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Size = UDim2.new(1, 0, 1, -30)
+ContentFrame.Position = UDim2.new(0, 0, 0, 30)
+ContentFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ContentFrame.BorderSizePixel = 0
+ContentFrame.Parent = MainFrame
+
+-- Authentication Frame
+local AuthFrame = Instance.new("Frame")
+AuthFrame.Name = "AuthFrame"
+AuthFrame.Size = UDim2.new(1, 0, 1, 0)
+AuthFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+AuthFrame.BorderSizePixel = 0
+AuthFrame.Visible = true
+AuthFrame.Parent = ContentFrame
+
+local AuthTitle = Instance.new("TextLabel")
+AuthTitle.Name = "AuthTitle"
+AuthTitle.Size = UDim2.new(1, 0, 0, 40)
+AuthTitle.Position = UDim2.new(0, 0, 0.1, 0)
+AuthTitle.BackgroundTransparency = 1
+AuthTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+AuthTitle.TextSize = 20
+AuthTitle.Font = Enum.Font.SourceSansBold
+AuthTitle.Text = "Enter Key to Continue"
+AuthTitle.Parent = AuthFrame
+
+local KeyInput = Instance.new("TextBox")
+KeyInput.Name = "KeyInput"
+KeyInput.Size = UDim2.new(0.8, 0, 0, 40)
+KeyInput.Position = UDim2.new(0.1, 0, 0.3, 0)
+KeyInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+KeyInput.BorderSizePixel = 0
+KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+KeyInput.TextSize = 16
+KeyInput.Font = Enum.Font.SourceSans
+KeyInput.PlaceholderText = "Enter Key Here..."
+KeyInput.Text = ""
+KeyInput.ClearTextOnFocus = false
+KeyInput.Parent = AuthFrame
+
+-- Add UICorner for key input
+local KeyInputCorner = Instance.new("UICorner")
+KeyInputCorner.CornerRadius = UDim.new(0, 8)
+KeyInputCorner.Parent = KeyInput
+
+local SubmitButton = Instance.new("TextButton")
+SubmitButton.Name = "SubmitButton"
+SubmitButton.Size = UDim2.new(0.5, 0, 0, 40)
+SubmitButton.Position = UDim2.new(0.25, 0, 0.5, 0)
+SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+SubmitButton.BorderSizePixel = 0
+SubmitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubmitButton.TextSize = 16
+SubmitButton.Font = Enum.Font.SourceSansBold
+SubmitButton.Text = "Submit"
+SubmitButton.Parent = AuthFrame
+
+-- Add UICorner for submit button
+local SubmitCorner = Instance.new("UICorner")
+SubmitCorner.CornerRadius = UDim.new(0, 8)
+SubmitCorner.Parent = SubmitButton
+
+-- Changed from key display to a note
+local KeyNote = Instance.new("TextLabel")
+KeyNote.Name = "KeyNote"
+KeyNote.Size = UDim2.new(1, 0, 0, 30)
+KeyNote.Position = UDim2.new(0, 0, 0.7, 0)
+KeyNote.BackgroundTransparency = 1
+KeyNote.TextColor3 = Color3.fromRGB(200, 200, 200)
+KeyNote.TextSize = 14
+KeyNote.Font = Enum.Font.SourceSans
+KeyNote.Text = "Liên hệ admin để nhận key"
+KeyNote.Parent = AuthFrame
+
+-- Main Features Frame (Hidden until authenticated)
+local FeaturesFrame = Instance.new("Frame")
+FeaturesFrame.Name = "FeaturesFrame"
+FeaturesFrame.Size = UDim2.new(1, 0, 1, 0)
+FeaturesFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+FeaturesFrame.BorderSizePixel = 0
+FeaturesFrame.Visible = false
+FeaturesFrame.Parent = ContentFrame
+
+-- Create ScrollingFrame for content with increased canvas size
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Name = "ScrollFrame"
+ScrollFrame.Size = UDim2.new(1, -10, 1, -10)
+ScrollFrame.Position = UDim2.new(0, 5, 0, 5)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.ScrollBarThickness = 6
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 950) -- Increased canvas size for more scrolling space
+ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Automatically adjust canvas size based on content
+ScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y -- Only allow vertical scrolling
+ScrollFrame.ScrollingEnabled = true -- Ensure scrolling is enabled
+ScrollFrame.ElasticBehavior = Enum.ElasticBehavior.Always -- Smooth elastic scrolling
+ScrollFrame.Parent = FeaturesFrame
+
+-- Create UIListLayout for organized content
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.Padding = UDim.new(0, 10)
+ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+ListLayout.Parent = ScrollFrame
+
+-- Section: Position Saving
+local PositionSection = Instance.new("Frame")
+PositionSection.Name = "PositionSection"
+PositionSection.Size = UDim2.new(0.95, 0, 0, 100)
+PositionSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+PositionSection.BorderSizePixel = 0
+PositionSection.Parent = ScrollFrame
+
+-- Add UICorner for position section
+local PositionSectionCorner = Instance.new("UICorner")
+PositionSectionCorner.CornerRadius = UDim.new(0, 8)
+PositionSectionCorner.Parent = PositionSection
+
+local PositionTitle = Instance.new("TextLabel")
+PositionTitle.Name = "PositionTitle"
+PositionTitle.Size = UDim2.new(1, 0, 0, 30)
+PositionTitle.BackgroundTransparency = 1
+PositionTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+PositionTitle.TextSize = 16
+PositionTitle.Font = Enum.Font.SourceSansBold
+PositionTitle.Text = "Position Controls"
+PositionTitle.Parent = PositionSection
+
+local SavePositionButton = Instance.new("TextButton")
+SavePositionButton.Name = "SavePositionButton"
+SavePositionButton.Size = UDim2.new(0.45, 0, 0, 35)
+SavePositionButton.Position = UDim2.new(0.05, 0, 0, 40)
+SavePositionButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+SavePositionButton.BorderSizePixel = 0
+SavePositionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SavePositionButton.TextSize = 14
+SavePositionButton.Font = Enum.Font.SourceSansBold
+SavePositionButton.Text = "Save Position"
+SavePositionButton.Parent = PositionSection
+
+-- Add UICorner for save position button
+local SavePositionCorner = Instance.new("UICorner")
+SavePositionCorner.CornerRadius = UDim.new(0, 6)
+SavePositionCorner.Parent = SavePositionButton
+
+local TeleportToSavedButton = Instance.new("TextButton")
+TeleportToSavedButton.Name = "TeleportToSavedButton"
+TeleportToSavedButton.Size = UDim2.new(0.45, 0, 0, 35)
+TeleportToSavedButton.Position = UDim2.new(0.5, 0, 0, 40)
+TeleportToSavedButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+TeleportToSavedButton.BorderSizePixel = 0
+TeleportToSavedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportToSavedButton.TextSize = 14
+TeleportToSavedButton.Font = Enum.Font.SourceSansBold
+TeleportToSavedButton.Text = "Teleport to Saved"
+TeleportToSavedButton.Parent = PositionSection
+
+-- Add UICorner for teleport to saved button
+local TeleportToSavedCorner = Instance.new("UICorner")
+TeleportToSavedCorner.CornerRadius = UDim.new(0, 6)
+TeleportToSavedCorner.Parent = TeleportToSavedButton
+
+-- Section: Player Targeting
+local TargetSection = Instance.new("Frame")
+TargetSection.Name = "TargetSection"
+TargetSection.Size = UDim2.new(0.95, 0, 0, 120)
+TargetSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+TargetSection.BorderSizePixel = 0
+TargetSection.Parent = ScrollFrame
+
+-- Add UICorner for target section
+local TargetSectionCorner = Instance.new("UICorner")
+TargetSectionCorner.CornerRadius = UDim.new(0, 8)
+TargetSectionCorner.Parent = TargetSection
+
+local TargetTitle = Instance.new("TextLabel")
+TargetTitle.Name = "TargetTitle"
+TargetTitle.Size = UDim2.new(1, 0, 0, 30)
+TargetTitle.BackgroundTransparency = 1
+TargetTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetTitle.TextSize = 16
+TargetTitle.Font = Enum.Font.SourceSansBold
+TargetTitle.Text = "Target Selection"
+TargetTitle.Parent = TargetSection
+
+local TargetDropdown = Instance.new("TextButton")
+TargetDropdown.Name = "TargetDropdown"
+TargetDropdown.Size = UDim2.new(0.6, 0, 0, 30)
+TargetDropdown.Position = UDim2.new(0.05, 0, 0, 35)
+TargetDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+TargetDropdown.BorderSizePixel = 0
+TargetDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetDropdown.TextSize = 14
+TargetDropdown.Font = Enum.Font.SourceSans
+TargetDropdown.Text = "Select Target"
+TargetDropdown.Parent = TargetSection
+
+-- Add UICorner for target dropdown
+local TargetDropdownCorner = Instance.new("UICorner")
+TargetDropdownCorner.CornerRadius = UDim.new(0, 6)
+TargetDropdownCorner.Parent = TargetDropdown
+
+local ReloadButton = Instance.new("TextButton")
+ReloadButton.Name = "ReloadButton"
+ReloadButton.Size = UDim2.new(0.25, 0, 0, 30)
+ReloadButton.Position = UDim2.new(0.7, 0, 0, 35)
+ReloadButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+ReloadButton.BorderSizePixel = 0
+ReloadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ReloadButton.TextSize = 14
+ReloadButton.Font = Enum.Font.SourceSans
+ReloadButton.Text = "Reload"
+ReloadButton.Parent = TargetSection
+
+-- Add UICorner for reload button
+local ReloadCorner = Instance.new("UICorner")
+ReloadCorner.CornerRadius = UDim.new(0, 6)
+ReloadCorner.Parent = ReloadButton
+
+local FollowButton = Instance.new("TextButton")
+FollowButton.Name = "FollowButton"
+FollowButton.Size = UDim2.new(0.45, 0, 0, 35)
+FollowButton.Position = UDim2.new(0.05, 0, 0, 75)
+FollowButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+FollowButton.BorderSizePixel = 0
+FollowButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+FollowButton.TextSize = 14
+FollowButton.Font = Enum.Font.SourceSansBold
+FollowButton.Text = "Follow: OFF"
+FollowButton.Parent = TargetSection
+
+-- Add UICorner for follow button
+local FollowCorner = Instance.new("UICorner")
+FollowCorner.CornerRadius = UDim.new(0, 6)
+FollowCorner.Parent = FollowButton
+
+local NextButton = Instance.new("TextButton")
+NextButton.Name = "NextButton"
+NextButton.Size = UDim2.new(0.45, 0, 0, 35)
+NextButton.Position = UDim2.new(0.5, 0, 0, 75)
+NextButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+NextButton.BorderSizePixel = 0
+NextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+NextButton.TextSize = 14
+NextButton.Font = Enum.Font.SourceSansBold
+NextButton.Text = "Auto Next: OFF"
+NextButton.Parent = TargetSection
+
+-- Add UICorner for next button
+local NextCorner = Instance.new("UICorner")
+NextCorner.CornerRadius = UDim.new(0, 6)
+NextCorner.Parent = NextButton
+
+-- Dropdown Frame for player selection
+local DropdownFrame = Instance.new("Frame")
+DropdownFrame.Name = "DropdownFrame"
+DropdownFrame.Size = UDim2.new(0.6, 0, 0, 200) -- Increased height for more players
+DropdownFrame.Position = UDim2.new(0.05, 0, 0, 65)
+DropdownFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+DropdownFrame.BorderSizePixel = 0
+DropdownFrame.Visible = false
+DropdownFrame.ZIndex = 10
+DropdownFrame.Parent = TargetSection
+
+-- Add UICorner for dropdown frame
+local DropdownFrameCorner = Instance.new("UICorner")
+DropdownFrameCorner.CornerRadius = UDim.new(0, 6)
+DropdownFrameCorner.Parent = DropdownFrame
+
+-- ScrollingFrame for player list with improved scrolling
+local PlayerScrollFrame = Instance.new("ScrollingFrame")
+PlayerScrollFrame.Name = "PlayerScrollFrame"
+PlayerScrollFrame.Size = UDim2.new(1, -10, 1, -10)
+PlayerScrollFrame.Position = UDim2.new(0, 5, 0, 5)
+PlayerScrollFrame.BackgroundTransparency = 1
+PlayerScrollFrame.BorderSizePixel = 0
+PlayerScrollFrame.ScrollBarThickness = 4
+PlayerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will adjust based on content
+PlayerScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Automatically adjust canvas size
+PlayerScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y -- Only allow vertical scrolling
+PlayerScrollFrame.ScrollingEnabled = true -- Ensure scrolling is enabled
+PlayerScrollFrame.ElasticBehavior = Enum.ElasticBehavior.Always -- Smooth elastic scrolling
+PlayerScrollFrame.ZIndex = 11
+PlayerScrollFrame.Parent = DropdownFrame
+
+-- UIListLayout for player list
+local PlayerListLayout = Instance.new("UIListLayout")
+PlayerListLayout.Padding = UDim.new(0, 5)
+PlayerListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+PlayerListLayout.Parent = PlayerScrollFrame
+
+-- Section: Distance Controls
+local DistanceSection = Instance.new("Frame")
+DistanceSection.Name = "DistanceSection"
+DistanceSection.Size = UDim2.new(0.95, 0, 0, 150)
+DistanceSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+DistanceSection.BorderSizePixel = 0
+DistanceSection.Parent = ScrollFrame
+
+-- Add UICorner for distance section
+local DistanceSectionCorner = Instance.new("UICorner")
+DistanceSectionCorner.CornerRadius = UDim.new(0, 8)
+DistanceSectionCorner.Parent = DistanceSection
+
+local DistanceTitle = Instance.new("TextLabel")
+DistanceTitle.Name = "DistanceTitle"
+DistanceTitle.Size = UDim2.new(1, 0, 0, 30)
+DistanceTitle.BackgroundTransparency = 1
+DistanceTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+DistanceTitle.TextSize = 16
+DistanceTitle.Font = Enum.Font.SourceSansBold
+DistanceTitle.Text = "Distance Controls"
+DistanceTitle.Parent = DistanceSection
+
+-- Horizontal Distance Controls
+local HorizontalLabel = Instance.new("TextLabel")
+HorizontalLabel.Name = "HorizontalLabel"
+HorizontalLabel.Size = UDim2.new(0.4, 0, 0, 25)
+HorizontalLabel.Position = UDim2.new(0.05, 0, 0, 35)
+HorizontalLabel.BackgroundTransparency = 1
+HorizontalLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalLabel.TextSize = 14
+HorizontalLabel.Font = Enum.Font.SourceSans
+HorizontalLabel.Text = "Behind:"
+HorizontalLabel.TextXAlignment = Enum.TextXAlignment.Left
+HorizontalLabel.Parent = DistanceSection
+
+local HorizontalInput = Instance.new("TextBox")
+HorizontalInput.Name = "HorizontalInput"
+HorizontalInput.Size = UDim2.new(0.2, 0, 0, 25)
+HorizontalInput.Position = UDim2.new(0.45, 0, 0, 35)
+HorizontalInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+HorizontalInput.BorderSizePixel = 0
+HorizontalInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalInput.TextSize = 14
+HorizontalInput.Font = Enum.Font.SourceSans
+HorizontalInput.Text = "5"
+HorizontalInput.Parent = DistanceSection
+
+-- Add UICorner for horizontal input
+local HorizontalInputCorner = Instance.new("UICorner")
+HorizontalInputCorner.CornerRadius = UDim.new(0, 6)
+HorizontalInputCorner.Parent = HorizontalInput
+
+local HorizontalPlus = Instance.new("TextButton")
+HorizontalPlus.Name = "HorizontalPlus"
+HorizontalPlus.Size = UDim2.new(0.1, 0, 0, 25)
+HorizontalPlus.Position = UDim2.new(0.7, 0, 0, 35)
+HorizontalPlus.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+HorizontalPlus.BorderSizePixel = 0
+HorizontalPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalPlus.TextSize = 14
+HorizontalPlus.Font = Enum.Font.SourceSansBold
+HorizontalPlus.Text = "+"
+HorizontalPlus.Parent = DistanceSection
+
+-- Add UICorner for horizontal plus
+local HorizontalPlusCorner = Instance.new("UICorner")
+HorizontalPlusCorner.CornerRadius = UDim.new(0, 6)
+HorizontalPlusCorner.Parent = HorizontalPlus
+
+local HorizontalMinus = Instance.new("TextButton")
+HorizontalMinus.Name = "HorizontalMinus"
+HorizontalMinus.Size = UDim2.new(0.1, 0, 0, 25)
+HorizontalMinus.Position = UDim2.new(0.85, 0, 0, 35)
+HorizontalMinus.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+HorizontalMinus.BorderSizePixel = 0
+HorizontalMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalMinus.TextSize = 14
+HorizontalMinus.Font = Enum.Font.SourceSansBold
+HorizontalMinus.Text = "-"
+HorizontalMinus.Parent = DistanceSection
+
+-- Add UICorner for horizontal minus
+local HorizontalMinusCorner = Instance.new("UICorner")
+HorizontalMinusCorner.CornerRadius = UDim.new(0, 6)
+HorizontalMinusCorner.Parent = HorizontalMinus
+
+-- Vertical Distance Controls
+local VerticalLabel = Instance.new("TextLabel")
+VerticalLabel.Name = "VerticalLabel"
+VerticalLabel.Size = UDim2.new(0.4, 0, 0, 25)
+VerticalLabel.Position = UDim2.new(0.05, 0, 0, 70)
+VerticalLabel.BackgroundTransparency = 1
+VerticalLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalLabel.TextSize = 14
+VerticalLabel.Font = Enum.Font.SourceSans
+VerticalLabel.Text = "Above:"
+VerticalLabel.TextXAlignment = Enum.TextXAlignment.Left
+VerticalLabel.Parent = DistanceSection
+
+local VerticalInput = Instance.new("TextBox")
+VerticalInput.Name = "VerticalInput"
+VerticalInput.Size = UDim2.new(0.2, 0, 0, 25)
+VerticalInput.Position = UDim2.new(0.45, 0, 0, 70)
+VerticalInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+VerticalInput.BorderSizePixel = 0
+VerticalInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalInput.TextSize = 14
+VerticalInput.Font = Enum.Font.SourceSans
+VerticalInput.Text = "0"
+VerticalInput.Parent = DistanceSection
+
+-- Add UICorner for vertical input
+local VerticalInputCorner = Instance.new("UICorner")
+VerticalInputCorner.CornerRadius = UDim.new(0, 6)
+VerticalInputCorner.Parent = VerticalInput
+
+local VerticalPlus = Instance.new("TextButton")
+VerticalPlus.Name = "VerticalPlus"
+VerticalPlus.Size = UDim2.new(0.1, 0, 0, 25)
+VerticalPlus.Position = UDim2.new(0.7, 0, 0, 70)
+VerticalPlus.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+VerticalPlus.BorderSizePixel = 0
+VerticalPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalPlus.TextSize = 14
+VerticalPlus.Font = Enum.Font.SourceSansBold
+VerticalPlus.Text = "+"
+VerticalPlus.Parent = DistanceSection
+
+-- Add UICorner for vertical plus
+local VerticalPlusCorner = Instance.new("UICorner")
+VerticalPlusCorner.CornerRadius = UDim.new(0, 6)
+VerticalPlusCorner.Parent = VerticalPlus
+
+local VerticalMinus = Instance.new("TextButton")
+VerticalMinus.Name = "VerticalMinus"
+VerticalMinus.Size = UDim2.new(0.1, 0, 0, 25)
+VerticalMinus.Position = UDim2.new(0.85, 0, 0, 70)
+VerticalMinus.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+VerticalMinus.BorderSizePixel = 0
+VerticalMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalMinus.TextSize = 14
+VerticalMinus.Font = Enum.Font.SourceSansBold
+VerticalMinus.Text = "-"
+VerticalMinus.Parent = DistanceSection
+
+-- Add UICorner for vertical minus
+local VerticalMinusCorner = Instance.new("UICorner")
+VerticalMinusCorner.CornerRadius = UDim.new(0, 6)
+VerticalMinusCorner.Parent = VerticalMinus
+
+-- Detection Radius Controls
+local RadiusLabel = Instance.new("TextLabel")
+RadiusLabel.Name = "RadiusLabel"
+RadiusLabel.Size = UDim2.new(0.4, 0, 0, 25)
+RadiusLabel.Position = UDim2.new(0.05, 0, 0, 105)
+RadiusLabel.BackgroundTransparency = 1
+RadiusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+RadiusLabel.TextSize = 14
+RadiusLabel.Font = Enum.Font.SourceSans
+RadiusLabel.Text = "Detection Radius:"
+RadiusLabel.TextXAlignment = Enum.TextXAlignment.Left
+RadiusLabel.Parent = DistanceSection
+
+local RadiusInput = Instance.new("TextBox")
+RadiusInput.Name = "RadiusInput"
+RadiusInput.Size = UDim2.new(0.2, 0, 0, 25)
+RadiusInput.Position = UDim2.new(0.45, 0, 0, 105)
+RadiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+RadiusInput.BorderSizePixel = 0
+RadiusInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+RadiusInput.TextSize = 14
+RadiusInput.Font = Enum.Font.SourceSans
+RadiusInput.Text = "20"
+RadiusInput.Parent = DistanceSection
+
+-- Add UICorner for radius input
+local RadiusInputCorner = Instance.new("UICorner")
+RadiusInputCorner.CornerRadius = UDim.new(0, 6)
+RadiusInputCorner.Parent = RadiusInput
+
+local RadiusPlus = Instance.new("TextButton")
+RadiusPlus.Name = "RadiusPlus"
+RadiusPlus.Size = UDim2.new(0.1, 0, 0, 25)
+RadiusPlus.Position = UDim2.new(0.7, 0, 0, 105)
+RadiusPlus.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+RadiusPlus.BorderSizePixel = 0
+RadiusPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
+RadiusPlus.TextSize = 14
+RadiusPlus.Font = Enum.Font.SourceSansBold
+RadiusPlus.Text = "+"
+RadiusPlus.Parent = DistanceSection
+
+-- Add UICorner for radius plus
+local RadiusPlusCorner = Instance.new("UICorner")
+RadiusPlusCorner.CornerRadius = UDim.new(0, 6)
+RadiusPlusCorner.Parent = RadiusPlus
+
+local RadiusMinus = Instance.new("TextButton")
+RadiusMinus.Name = "RadiusMinus"
+RadiusMinus.Size = UDim2.new(0.1, 0, 0, 25)
+RadiusMinus.Position = UDim2.new(0.85, 0, 0, 105)
+RadiusMinus.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+RadiusMinus.BorderSizePixel = 0
+RadiusMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
+RadiusMinus.TextSize = 14
+RadiusMinus.Font = Enum.Font.SourceSansBold
+RadiusMinus.Text = "-"
+RadiusMinus.Parent = DistanceSection
+
+-- Add UICorner for radius minus
+local RadiusMinusCorner = Instance.new("UICorner")
+RadiusMinusCorner.CornerRadius = UDim.new(0, 6)
+RadiusMinusCorner.Parent = RadiusMinus
+
+-- Section: Feature Buttons
+local FeaturesButtonSection = Instance.new("Frame")
+FeaturesButtonSection.Name = "FeaturesButtonSection"
+FeaturesButtonSection.Size = UDim2.new(0.95, 0, 0, 180)
+FeaturesButtonSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+FeaturesButtonSection.BorderSizePixel = 0
+FeaturesButtonSection.Parent = ScrollFrame
+
+-- Add UICorner for features button section
+local FeaturesButtonSectionCorner = Instance.new("UICorner")
+FeaturesButtonSectionCorner.CornerRadius = UDim.new(0, 8)
+FeaturesButtonSectionCorner.Parent = FeaturesButtonSection
+
+local FeaturesTitle = Instance.new("TextLabel")
+FeaturesTitle.Name = "FeaturesTitle"
+FeaturesTitle.Size = UDim2.new(1, 0, 0, 30)
+FeaturesTitle.BackgroundTransparency = 1
+FeaturesTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+FeaturesTitle.TextSize = 16
+FeaturesTitle.Font = Enum.Font.SourceSansBold
+FeaturesTitle.Text = "Features"
+FeaturesTitle.Parent = FeaturesButtonSection
+
+-- Noclip Button
+local NoclipButton = Instance.new("TextButton")
+NoclipButton.Name = "NoclipButton"
+NoclipButton.Size = UDim2.new(0.45, 0, 0, 35)
+NoclipButton.Position = UDim2.new(0.05, 0, 0, 35)
+NoclipButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+NoclipButton.BorderSizePixel = 0
+NoclipButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+NoclipButton.TextSize = 14
+NoclipButton.Font = Enum.Font.SourceSansBold
+NoclipButton.Text = "Noclip: OFF"
+NoclipButton.Parent = FeaturesButtonSection
+
+-- Add UICorner for noclip button
+local NoclipCorner = Instance.new("UICorner")
+NoclipCorner.CornerRadius = UDim.new(0, 6)
+NoclipCorner.Parent = NoclipButton
+
+-- Platform Button
+local PlatformButton = Instance.new("TextButton")
+PlatformButton.Name = "PlatformButton"
+PlatformButton.Size = UDim2.new(0.45, 0, 0, 35)
+PlatformButton.Position = UDim2.new(0.5, 0, 0, 35)
+PlatformButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+PlatformButton.BorderSizePixel = 0
+PlatformButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+PlatformButton.TextSize = 14
+PlatformButton.Font = Enum.Font.SourceSansBold
+PlatformButton.Text = "Platform: OFF"
+PlatformButton.Parent = FeaturesButtonSection
+
+-- Add UICorner for platform button
+local PlatformCorner = Instance.new("UICorner")
+PlatformCorner.CornerRadius = UDim.new(0, 6)
+PlatformCorner.Parent = PlatformButton
+
+-- Run Button
+local RunButton = Instance.new("TextButton")
+RunButton.Name = "RunButton"
+RunButton.Size = UDim2.new(0.45, 0, 0, 35)
+RunButton.Position = UDim2.new(0.05, 0, 0, 80)
+RunButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+RunButton.BorderSizePixel = 0
+RunButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+RunButton.TextSize = 14
+RunButton.Font = Enum.Font.SourceSansBold
+RunButton.Text = "Run Away: OFF"
+RunButton.Parent = FeaturesButtonSection
+
+-- Add UICorner for run button
+local RunCorner = Instance.new("UICorner")
+RunCorner.CornerRadius = UDim.new(0, 6)
+RunCorner.Parent = RunButton
+
+-- Auto Next Checkbox
+local AutoNextCheck = Instance.new("Frame")
+AutoNextCheck.Name = "AutoNextCheck"
+AutoNextCheck.Size = UDim2.new(0.05, 0, 0, 20)
+AutoNextCheck.Position = UDim2.new(0.5, 0, 0, 87.5)
+AutoNextCheck.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+AutoNextCheck.BorderSizePixel = 0
+AutoNextCheck.Parent = FeaturesButtonSection
+
+-- Add UICorner for auto next check
+local AutoNextCheckCorner = Instance.new("UICorner")
+AutoNextCheckCorner.CornerRadius = UDim.new(0, 4)
+AutoNextCheckCorner.Parent = AutoNextCheck
+
+local AutoNextLabel = Instance.new("TextLabel")
+AutoNextLabel.Name = "AutoNextLabel"
+AutoNextLabel.Size = UDim2.new(0.35, 0, 0, 35)
+AutoNextLabel.Position = UDim2.new(0.6, 0, 0, 80)
+AutoNextLabel.BackgroundTransparency = 1
+AutoNextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoNextLabel.TextSize = 14
+AutoNextLabel.Font = Enum.Font.SourceSans
+AutoNextLabel.Text = "Auto Next Target"
+AutoNextLabel.TextXAlignment = Enum.TextXAlignment.Left
+AutoNextLabel.Parent = FeaturesButtonSection
+
+-- Auto Platform Checkbox
+local AutoPlatformCheck = Instance.new("Frame")
+AutoPlatformCheck.Name = "AutoPlatformCheck"
+AutoPlatformCheck.Size = UDim2.new(0.05, 0, 0, 20)
+AutoPlatformCheck.Position = UDim2.new(0.05, 0, 0, 132.5)
+AutoPlatformCheck.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+AutoPlatformCheck.BorderSizePixel = 0
+AutoPlatformCheck.Parent = FeaturesButtonSection
+
+-- Add UICorner for auto platform check
+local AutoPlatformCheckCorner = Instance.new("UICorner")
+AutoPlatformCheckCorner.CornerRadius = UDim.new(0, 4)
+AutoPlatformCheckCorner.Parent = AutoPlatformCheck
+
+local AutoPlatformLabel = Instance.new("TextLabel")
+AutoPlatformLabel.Name = "AutoPlatformLabel"
+AutoPlatformLabel.Size = UDim2.new(0.35, 0, 0, 35)
+AutoPlatformLabel.Position = UDim2.new(0.15, 0, 0, 125)
+AutoPlatformLabel.BackgroundTransparency = 1
+AutoPlatformLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoPlatformLabel.TextSize = 14
+AutoPlatformLabel.Font = Enum.Font.SourceSans
+AutoPlatformLabel.Text = "Auto Platform"
+AutoPlatformLabel.TextXAlignment = Enum.TextXAlignment.Left
+AutoPlatformLabel.Parent = FeaturesButtonSection
+
+-- Run Away Checkbox
+local RunAwayCheck = Instance.new("Frame")
+RunAwayCheck.Name = "RunAwayCheck"
+RunAwayCheck.Size = UDim2.new(0.05, 0, 0, 20)
+RunAwayCheck.Position = UDim2.new(0.5, 0, 0, 132.5)
+RunAwayCheck.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+RunAwayCheck.BorderSizePixel = 0
+RunAwayCheck.Parent = FeaturesButtonSection
+
+-- Add UICorner for run away check
+local RunAwayCheckCorner = Instance.new("UICorner")
+RunAwayCheckCorner.CornerRadius = UDim.new(0, 4)
+RunAwayCheckCorner.Parent = RunAwayCheck
+
+local RunAwayLabel = Instance.new("TextLabel")
+RunAwayLabel.Name = "RunAwayLabel"
+RunAwayLabel.Size = UDim2.new(0.35, 0, 0, 35)
+RunAwayLabel.Position = UDim2.new(0.6, 0, 0, 125)
+RunAwayLabel.BackgroundTransparency = 1
+RunAwayLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+RunAwayLabel.TextSize = 14
+RunAwayLabel.Font = Enum.Font.SourceSans
+RunAwayLabel.Text = "Run on Detect"
+RunAwayLabel.TextXAlignment = Enum.TextXAlignment.Left
+RunAwayLabel.Parent = FeaturesButtonSection
+
+-- Expiration Info
+local ExpirationSection = Instance.new("Frame")
+ExpirationSection.Name = "ExpirationSection"
+ExpirationSection.Size = UDim2.new(0.95, 0, 0, 50)
+ExpirationSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ExpirationSection.BorderSizePixel = 0
+ExpirationSection.Parent = ScrollFrame
+
+-- Add UICorner for expiration section
+local ExpirationSectionCorner = Instance.new("UICorner")
+ExpirationSectionCorner.CornerRadius = UDim.new(0, 8)
+ExpirationSectionCorner.Parent = ExpirationSection
+
+local ExpirationLabel = Instance.new("TextLabel")
+ExpirationLabel.Name = "ExpirationLabel"
+ExpirationLabel.Size = UDim2.new(1, 0, 1, 0)
+ExpirationLabel.BackgroundTransparency = 1
+ExpirationLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+ExpirationLabel.TextSize = 14
+ExpirationLabel.Font = Enum.Font.SourceSans
+ExpirationLabel.Text = "Expires: Loading..."
+ExpirationLabel.Parent = ExpirationSection
+
+-- Section: Look At Player
+local LookAtSection = Instance.new("Frame")
+LookAtSection.Name = "LookAtSection"
+LookAtSection.Size = UDim2.new(0.95, 0, 0, 180)
+LookAtSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+LookAtSection.BorderSizePixel = 0
+LookAtSection.Parent = ScrollFrame
+
+-- Add UICorner for look at section
+local LookAtSectionCorner = Instance.new("UICorner")
+LookAtSectionCorner.CornerRadius = UDim.new(0, 8)
+LookAtSectionCorner.Parent = LookAtSection
+
+local LookAtTitle = Instance.new("TextLabel")
+LookAtTitle.Name = "LookAtTitle"
+LookAtTitle.Size = UDim2.new(1, 0, 0, 30)
+LookAtTitle.BackgroundTransparency = 1
+LookAtTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+LookAtTitle.TextSize = 16
+LookAtTitle.Font = Enum.Font.SourceSansBold
+LookAtTitle.Text = "Look At Player"
+LookAtTitle.Parent = LookAtSection
+
+-- Look At Toggle Button
+local LookAtButton = Instance.new("TextButton")
+LookAtButton.Name = "LookAtButton"
+LookAtButton.Size = UDim2.new(0.45, 0, 0, 35)
+LookAtButton.Position = UDim2.new(0.05, 0, 0, 35)
+LookAtButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+LookAtButton.BorderSizePixel = 0
+LookAtButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+LookAtButton.TextSize = 14
+LookAtButton.Font = Enum.Font.SourceSansBold
+LookAtButton.Text = "Look At: OFF"
+LookAtButton.Parent = LookAtSection
+
+-- Add UICorner for look at button
+local LookAtCorner = Instance.new("UICorner")
+LookAtCorner.CornerRadius = UDim.new(0, 6)
+LookAtCorner.Parent = LookAtButton
+
+-- Body Part Button
+local BodyPartButton = Instance.new("TextButton")
+BodyPartButton.Name = "BodyPartButton"
+BodyPartButton.Size = UDim2.new(0.45, 0, 0, 35)
+BodyPartButton.Position = UDim2.new(0.5, 0, 0, 35)
+BodyPartButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+BodyPartButton.BorderSizePixel = 0
+BodyPartButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BodyPartButton.TextSize = 14
+BodyPartButton.Font = Enum.Font.SourceSansBold
+BodyPartButton.Text = "Part: Head"
+BodyPartButton.Parent = LookAtSection
+
+-- Add UICorner for body part button
+local BodyPartCorner = Instance.new("UICorner")
+BodyPartCorner.CornerRadius = UDim.new(0, 6)
+BodyPartCorner.Parent = BodyPartButton
+
+-- Nearest Player Button
+local NearestPlayerButton = Instance.new("TextButton")
+NearestPlayerButton.Name = "NearestPlayerButton"
+NearestPlayerButton.Size = UDim2.new(0.45, 0, 0, 35)
+NearestPlayerButton.Position = UDim2.new(0.05, 0, 0, 80)
+NearestPlayerButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+NearestPlayerButton.BorderSizePixel = 0
+NearestPlayerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+NearestPlayerButton.TextSize = 14
+NearestPlayerButton.Font = Enum.Font.SourceSansBold
+NearestPlayerButton.Text = "Select Nearest"
+NearestPlayerButton.Parent = LookAtSection
+
+-- Add UICorner for nearest player button
+local NearestPlayerCorner = Instance.new("UICorner")
+NearestPlayerCorner.CornerRadius = UDim.new(0, 6)
+NearestPlayerCorner.Parent = NearestPlayerButton
+
+-- Teleport Behind Button
+local TeleportBehindButton = Instance.new("TextButton")
+TeleportBehindButton.Name = "TeleportBehindButton"
+TeleportBehindButton.Size = UDim2.new(0.45, 0, 0, 35)
+TeleportBehindButton.Position = UDim2.new(0.5, 0, 0, 80)
+TeleportBehindButton.BackgroundColor3 = Color3.fromRGB(0, 0, 255)
+TeleportBehindButton.BorderSizePixel = 0
+TeleportBehindButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportBehindButton.TextSize = 14
+TeleportBehindButton.Font = Enum.Font.SourceSansBold
+TeleportBehindButton.Text = "Teleport Behind"
+TeleportBehindButton.Parent = LookAtSection
+
+-- Add UICorner for teleport behind button
+local TeleportBehindCorner = Instance.new("UICorner")
+TeleportBehindCorner.CornerRadius = UDim.new(0, 6)
+TeleportBehindCorner.Parent = TeleportBehindButton
+
+-- Current Target Label
+local CurrentTargetLabel = Instance.new("TextLabel")
+CurrentTargetLabel.Name = "CurrentTargetLabel"
+CurrentTargetLabel.Size = UDim2.new(0.9, 0, 0, 25)
+CurrentTargetLabel.Position = UDim2.new(0.05, 0, 0, 125)
+CurrentTargetLabel.BackgroundTransparency = 1
+CurrentTargetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+CurrentTargetLabel.TextSize = 14
+CurrentTargetLabel.Font = Enum.Font.SourceSans
+CurrentTargetLabel.Text = "Current Target: None"
+CurrentTargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+CurrentTargetLabel.Parent = LookAtSection
+
+-- ESP Section (New)
+local ESPSection = Instance.new("Frame")
+ESPSection.Name = "ESPSection"
+ESPSection.Size = UDim2.new(0.95, 0, 0, 180)
+ESPSection.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ESPSection.BorderSizePixel = 0
+ESPSection.Parent = ScrollFrame
+
+-- Add UICorner for ESP section
+local ESPSectionCorner = Instance.new("UICorner")
+ESPSectionCorner.CornerRadius = UDim.new(0, 8)
+ESPSectionCorner.Parent = ESPSection
+
+local ESPSectionTitle = Instance.new("TextLabel")
+ESPSectionTitle.Name = "ESPSectionTitle"
+ESPSectionTitle.Size = UDim2.new(1, 0, 0, 30)
+ESPSectionTitle.BackgroundTransparency = 1
+ESPSectionTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPSectionTitle.TextSize = 16
+ESPSectionTitle.Font = Enum.Font.SourceSansBold
+ESPSectionTitle.Text = "ESP Settings"
+ESPSectionTitle.Parent = ESPSection
+
+-- ESP Toggle Button
+local ESPToggleButton = Instance.new("TextButton")
+ESPToggleButton.Name = "ESPToggleButton"
+ESPToggleButton.Size = UDim2.new(0.45, 0, 0, 35)
+ESPToggleButton.Position = UDim2.new(0.05, 0, 0, 35)
+ESPToggleButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+ESPToggleButton.BorderSizePixel = 0
+ESPToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPToggleButton.TextSize = 14
+ESPToggleButton.Font = Enum.Font.SourceSansBold
+ESPToggleButton.Text = "ESP: ON"
+ESPToggleButton.Parent = ESPSection
+
+-- Add UICorner for ESP toggle button
+local ESPToggleCorner = Instance.new("UICorner")
+ESPToggleCorner.CornerRadius = UDim.new(0, 6)
+ESPToggleCorner.Parent = ESPToggleButton
+
+-- ESP Type Dropdown
+local ESPTypeDropdown = Instance.new("TextButton")
+ESPTypeDropdown.Name = "ESPTypeDropdown"
+ESPTypeDropdown.Size = UDim2.new(0.45, 0, 0, 35)
+ESPTypeDropdown.Position = UDim2.new(0.5, 0, 0, 35)
+ESPTypeDropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+ESPTypeDropdown.BorderSizePixel = 0
+ESPTypeDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPTypeDropdown.TextSize = 14
+ESPTypeDropdown.Font = Enum.Font.SourceSansBold
+ESPTypeDropdown.Text = "Type: Name"
+ESPTypeDropdown.Parent = ESPSection
+
+-- Add UICorner for ESP type dropdown
+local ESPTypeCorner = Instance.new("UICorner")
+ESPTypeCorner.CornerRadius = UDim.new(0, 6)
+ESPTypeCorner.Parent = ESPTypeDropdown
+
+-- ESP Color Input
+local ESPColorInput = Instance.new("TextBox")
+ESPColorInput.Name = "ESPColorInput"
+ESPColorInput.Size = UDim2.new(0.45, 0, 0, 35)
+ESPColorInput.Position = UDim2.new(0.05, 0, 0, 80)
+ESPColorInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ESPColorInput.BorderSizePixel = 0
+ESPColorInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPColorInput.TextSize = 14
+ESPColorInput.Font = Enum.Font.SourceSans
+ESPColorInput.PlaceholderText = "Color (hex): #FFFFFF"
+ESPColorInput.Text = "#FFFFFF"
+ESPColorInput.Parent = ESPSection
+
+-- Add UICorner for ESP color input
+local ESPColorCorner = Instance.new("UICorner")
+ESPColorCorner.CornerRadius = UDim.new(0, 6)
+ESPColorCorner.Parent = ESPColorInput
+
+-- ESP Size Input
+local ESPSizeInput = Instance.new("TextBox")
+ESPSizeInput.Name = "ESPSizeInput"
+ESPSizeInput.Size = UDim2.new(0.45, 0, 0, 35)
+ESPSizeInput.Position = UDim2.new(0.5, 0, 0, 80)
+ESPSizeInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ESPSizeInput.BorderSizePixel = 0
+ESPSizeInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPSizeInput.TextSize = 14
+ESPSizeInput.Font = Enum.Font.SourceSans
+ESPSizeInput.PlaceholderText = "Text Size: 16"
+ESPSizeInput.Text = "16"
+ESPSizeInput.Parent = ESPSection
+
+-- Add UICorner for ESP size input
+local ESPSizeCorner = Instance.new("UICorner")
+ESPSizeCorner.CornerRadius = UDim.new(0, 6)
+ESPSizeCorner.Parent = ESPSizeInput
+
+-- ESP Through Walls Toggle
+local ESPWallsToggle = Instance.new("TextButton")
+ESPWallsToggle.Name = "ESPWallsToggle"
+ESPWallsToggle.Size = UDim2.new(0.45, 0, 0, 35)
+ESPWallsToggle.Position = UDim2.new(0.05, 0, 0, 125)
+ESPWallsToggle.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+ESPWallsToggle.BorderSizePixel = 0
+ESPWallsToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPWallsToggle.TextSize = 14
+ESPWallsToggle.Font = Enum.Font.SourceSan255,255)
+ESPWallsToggle.TextSize = 14
+ESPWallsToggle.Font = Enum.Font.SourceSansBold
+ESPWallsToggle.Text = "Through Walls: ON"
+ESPWallsToggle.Parent = ESPSection
+
+-- Add UICorner for ESP walls toggle
+local ESPWallsCorner = Instance.new("UICorner")
+ESPWallsCorner.CornerRadius = UDim.new(0, 6)
+ESPWallsCorner.Parent = ESPWallsToggle
+
+-- ESP Show Distance Toggle
+local ESPDistanceToggle = Instance.new("TextButton")
+ESPDistanceToggle.Name = "ESPDistanceToggle"
+ESPDistanceToggle.Size = UDim2.new(0.45, 0, 0, 35)
+ESPDistanceToggle.Position = UDim2.new(0.5, 0, 0, 125)
+ESPDistanceToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+ESPDistanceToggle.BorderSizePixel = 0
+ESPDistanceToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPDistanceToggle.TextSize = 14
+ESPDistanceToggle.Font = Enum.Font.SourceSansBold
+ESPDistanceToggle.Text = "Show Distance: OFF"
+ESPDistanceToggle.Parent = ESPSection
+
+-- Add UICorner for ESP distance toggle
+local ESPDistanceCorner = Instance.new("UICorner")
+ESPDistanceCorner.CornerRadius = UDim.new(0, 6)
+ESPDistanceCorner.Parent = ESPDistanceToggle
+
+-- Expired Frame (Hidden until expired)
+local ExpiredFrame = Instance.new("Frame")
+ExpiredFrame.Name = "ExpiredFrame"
+ExpiredFrame.Size = UDim2.new(1, 0, 1, 0)
+ExpiredFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ExpiredFrame.BorderSizePixel = 0
+ExpiredFrame.Visible = false
+ExpiredFrame.Parent = ContentFrame
+
+local ExpiredLabel = Instance.new("TextLabel")
+ExpiredLabel.Name = "ExpiredLabel"
+ExpiredLabel.Size = UDim2.new(1, 0, 0, 40)
+ExpiredLabel.Position = UDim2.new(0, 0, 0.3, 0)
+ExpiredLabel.BackgroundTransparency = 1
+ExpiredLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+ExpiredLabel.TextSize = 20
+ExpiredLabel.Font = Enum.Font.SourceSansBold
+ExpiredLabel.Text = "Script Roblox này đã hết thời gian sử dụng"
+ExpiredLabel.Parent = ExpiredFrame
+
+local DeleteButton = Instance.new("TextButton")
+DeleteButton.Name = "DeleteButton"
+DeleteButton.Size = UDim2.new(0.6, 0, 0, 40)
+DeleteButton.Position = UDim2.new(0.2, 0, 0.5, 0)
+DeleteButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+DeleteButton.BorderSizePixel = 0
+DeleteButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+DeleteButton.TextSize = 16
+DeleteButton.Font = Enum.Font.SourceSansBold
+DeleteButton.Text = "Xóa Script"
+DeleteButton.Parent = ExpiredFrame
+
+-- Add UICorner for delete button
+local DeleteCorner = Instance.new("UICorner")
+DeleteCorner.CornerRadius = UDim.new(0, 8)
+DeleteCorner.Parent = DeleteButton
+
+-- Icon for minimized state
+local MinimizedIcon = Instance.new("ImageButton")
+MinimizedIcon.Name = "MinimizedIcon"
+MinimizedIcon.Size = UDim2.new(0, 50, 0, 50)
+MinimizedIcon.Position = UDim2.new(0, 10, 0, 10)
+MinimizedIcon.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+MinimizedIcon.BorderSizePixel = 0
+MinimizedIcon.Image = "rbxassetid://6034684949" -- Generic script icon
+MinimizedIcon.Visible = false
+MinimizedIcon.Active = true -- Enable interaction
+MinimizedIcon.Draggable = true -- Enable built-in dragging
+MinimizedIcon.Parent = ScreenGui
+
+-- Add UICorner for minimized icon
+local MinimizedIconCorner = Instance.new("UICorner")
+MinimizedIconCorner.CornerRadius = UDim.new(0, 8)
+MinimizedIconCorner.Parent = MinimizedIcon
+
+-- Add UIStroke for minimized icon
+local MinimizedIconStroke = Instance.new("UIStroke")
+MinimizedIconStroke.Thickness = 2
+MinimizedIconStroke.Color = Color3.fromRGB(255, 0, 0)
+MinimizedIconStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+MinimizedIconStroke.Parent = MinimizedIcon
+
+-- SubMenu Frame (Hidden by default)
+local SubMenuFrame = Instance.new("Frame")
+SubMenuFrame.Name = "SubMenuFrame"
+SubMenuFrame.Size = UDim2.new(0, 250, 0, 300)
+SubMenuFrame.Position = UDim2.new(0.5, 175, 0.5, -150)
+SubMenuFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+SubMenuFrame.BorderSizePixel = 0
+SubMenuFrame.Visible = false
+SubMenuFrame.Active = true
+SubMenuFrame.Draggable = true -- Enable built-in dragging
+SubMenuFrame.Parent = ScreenGui
+
+-- Add UICorner for submenu frame
+local SubMenuCorner = Instance.new("UICorner")
+SubMenuCorner.CornerRadius = UDim.new(0, 8)
+SubMenuCorner.Parent = SubMenuFrame
+
+-- Add UIStroke for submenu frame
+local SubMenuStroke = Instance.new("UIStroke")
+SubMenuStroke.Thickness = 2
+SubMenuStroke.Color = Color3.fromRGB(255, 0, 0)
+SubMenuStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+SubMenuStroke.Parent = SubMenuFrame
+
+-- SubMenu Title Bar
+local SubMenuTitleBar = Instance.new("Frame")
+SubMenuTitleBar.Name = "SubMenuTitleBar"
+SubMenuTitleBar.Size = UDim2.new(1, 0, 0, 30)
+SubMenuTitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+SubMenuTitleBar.BorderSizePixel = 0
+SubMenuTitleBar.Parent = SubMenuFrame
+
+-- Add UICorner for submenu title bar
+local SubMenuTitleCorner = Instance.new("UICorner")
+SubMenuTitleCorner.CornerRadius = UDim.new(0, 8)
+SubMenuTitleCorner.Parent = SubMenuTitleBar
+
+-- SubMenu Title
+local SubMenuTitle = Instance.new("TextLabel")
+SubMenuTitle.Name = "SubMenuTitle"
+SubMenuTitle.Size = UDim2.new(1, -40, 1, 0)
+SubMenuTitle.Position = UDim2.new(0, 10, 0, 0)
+SubMenuTitle.BackgroundTransparency = 1
+SubMenuTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubMenuTitle.TextSize = 16
+SubMenuTitle.Font = Enum.Font.SourceSansBold
+SubMenuTitle.Text = "Safety Settings"
+SubMenuTitle.TextXAlignment = Enum.TextXAlignment.Left
+SubMenuTitle.Parent = SubMenuTitleBar
+
+-- SubMenu Close Button
+local SubMenuCloseButton = Instance.new("TextButton")
+SubMenuCloseButton.Name = "SubMenuCloseButton"
+SubMenuCloseButton.Size = UDim2.new(0, 30, 0, 30)
+SubMenuCloseButton.Position = UDim2.new(1, -30, 0, 0)
+SubMenuCloseButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+SubMenuCloseButton.BorderSizePixel = 0
+SubMenuCloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubMenuCloseButton.TextSize = 16
+SubMenuCloseButton.Font = Enum.Font.SourceSansBold
+SubMenuCloseButton.Text = "X"
+SubMenuCloseButton.Parent = SubMenuTitleBar
+
+-- Add UICorner for submenu close button
+local SubMenuCloseCorner = Instance.new("UICorner")
+SubMenuCloseCorner.CornerRadius = UDim.new(0, 8)
+SubMenuCloseCorner.Parent = SubMenuCloseButton
+
+-- SubMenu Content
+local SubMenuContent = Instance.new("Frame")
+SubMenuContent.Name = "SubMenuContent"
+SubMenuContent.Size = UDim2.new(1, 0, 1, -30)
+SubMenuContent.Position = UDim2.new(0, 0, 0, 30)
+SubMenuContent.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+SubMenuContent.BorderSizePixel = 0
+SubMenuContent.Parent = SubMenuFrame
+
+-- Auto Check Position Toggle
+local AutoCheckLabel = Instance.new("TextLabel")
+AutoCheckLabel.Name = "AutoCheckLabel"
+AutoCheckLabel.Size = UDim2.new(0.7, 0, 0, 30)
+AutoCheckLabel.Position = UDim2.new(0.05, 0, 0, 10)
+AutoCheckLabel.BackgroundTransparency = 1
+AutoCheckLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoCheckLabel.TextSize = 14
+AutoCheckLabel.Font = Enum.Font.SourceSansBold
+AutoCheckLabel.Text = "Auto Check Position:"
+AutoCheckLabel.TextXAlignment = Enum.TextXAlignment.Left
+AutoCheckLabel.Parent = SubMenuContent
+
+local AutoCheckButton = Instance.new("TextButton")
+AutoCheckButton.Name = "AutoCheckButton"
+AutoCheckButton.Size = UDim2.new(0.2, 0, 0, 30)
+AutoCheckButton.Position = UDim2.new(0.75, 0, 0, 10)
+AutoCheckButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+AutoCheckButton.BorderSizePixel = 0
+AutoCheckButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoCheckButton.TextSize = 14
+AutoCheckButton.Font = Enum.Font.SourceSansBold
+AutoCheckButton.Text = "OFF"
+AutoCheckButton.Parent = SubMenuContent
+
+-- Add UICorner for auto check button
+local AutoCheckCorner = Instance.new("UICorner")
+AutoCheckCorner.CornerRadius = UDim.new(0, 6)
+AutoCheckCorner.Parent = AutoCheckButton
+
+-- Safe Position Vertical Min
+local VerticalMinLabel = Instance.new("TextLabel")
+VerticalMinLabel.Name = "VerticalMinLabel"
+VerticalMinLabel.Size = UDim2.new(0.5, 0, 0, 30)
+VerticalMinLabel.Position = UDim2.new(0.05, 0, 0, 50)
+VerticalMinLabel.BackgroundTransparency = 1
+VerticalMinLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalMinLabel.TextSize = 14
+VerticalMinLabel.Font = Enum.Font.SourceSans
+VerticalMinLabel.Text = "Vertical Min (Y):"
+VerticalMinLabel.TextXAlignment = Enum.TextXAlignment.Left
+VerticalMinLabel.Parent = SubMenuContent
+
+local VerticalMinInput = Instance.new("TextBox")
+VerticalMinInput.Name = "VerticalMinInput"
+VerticalMinInput.Size = UDim2.new(0.3, 0, 0, 30)
+VerticalMinInput.Position = UDim2.new(0.65, 0, 0, 50)
+VerticalMinInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+VerticalMinInput.BorderSizePixel = 0
+VerticalMinInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalMinInput.TextSize = 14
+VerticalMinInput.Font = Enum.Font.SourceSans
+VerticalMinInput.Text = "-1000"
+VerticalMinInput.Parent = SubMenuContent
+
+-- Add UICorner for vertical min input
+local VerticalMinCorner = Instance.new("UICorner")
+VerticalMinCorner.CornerRadius = UDim.new(0, 6)
+VerticalMinCorner.Parent = VerticalMinInput
+
+-- Safe Position Vertical Max
+local VerticalMaxLabel = Instance.new("TextLabel")
+VerticalMaxLabel.Name = "VerticalMaxLabel"
+VerticalMaxLabel.Size = UDim2.new(0.5, 0, 0, 30)
+VerticalMaxLabel.Position = UDim2.new(0.05, 0, 0, 90)
+VerticalMaxLabel.BackgroundTransparency = 1
+VerticalMaxLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalMaxLabel.TextSize = 14
+VerticalMaxLabel.Font = Enum.Font.SourceSans
+VerticalMaxLabel.Text = "Vertical Max (Y):"
+VerticalMaxLabel.TextXAlignment = Enum.TextXAlignment.Left
+VerticalMaxLabel.Parent = SubMenuContent
+
+local VerticalMaxInput = Instance.new("TextBox")
+VerticalMaxInput.Name = "VerticalMaxInput"
+VerticalMaxInput.Size = UDim2.new(0.3, 0, 0, 30)
+VerticalMaxInput.Position = UDim2.new(0.65, 0, 0, 90)
+VerticalMaxInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+VerticalMaxInput.BorderSizePixel = 0
+VerticalMaxInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerticalMaxInput.TextSize = 14
+VerticalMaxInput.Font = Enum.Font.SourceSans
+VerticalMaxInput.Text = "1000"
+VerticalMaxInput.Parent = SubMenuContent
+
+-- Add UICorner for vertical max input
+local VerticalMaxCorner = Instance.new("UICorner")
+VerticalMaxCorner.CornerRadius = UDim.new(0, 6)
+VerticalMaxCorner.Parent = VerticalMaxInput
+
+-- Safe Position Horizontal Min
+local HorizontalMinLabel = Instance.new("TextLabel")
+HorizontalMinLabel.Name = "HorizontalMinLabel"
+HorizontalMinLabel.Size = UDim2.new(0.5, 0, 0, 30)
+HorizontalMinLabel.Position = UDim2.new(0.05, 0, 0, 130)
+HorizontalMinLabel.BackgroundTransparency = 1
+HorizontalMinLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalMinLabel.TextSize = 14
+HorizontalMinLabel.Font = Enum.Font.SourceSans
+HorizontalMinLabel.Text = "Horizontal Min (X/Z):"
+HorizontalMinLabel.TextXAlignment = Enum.TextXAlignment.Left
+HorizontalMinLabel.Parent = SubMenuContent
+
+local HorizontalMinInput = Instance.new("TextBox")
+HorizontalMinInput.Name = "HorizontalMinInput"
+HorizontalMinInput.Size = UDim2.new(0.3, 0, 0, 30)
+HorizontalMinInput.Position = UDim2.new(0.65, 0, 0, 130)
+HorizontalMinInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+HorizontalMinInput.BorderSizePixel = 0
+HorizontalMinInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalMinInput.TextSize = 14
+HorizontalMinInput.Font = Enum.Font.SourceSans
+HorizontalMinInput.Text = "-1000"
+HorizontalMinInput.Parent = SubMenuContent
+
+-- Add UICorner for horizontal min input
+local HorizontalMinCorner = Instance.new("UICorner")
+HorizontalMinCorner.CornerRadius = UDim.new(0, 6)
+HorizontalMinCorner.Parent = HorizontalMinInput
+
+-- Safe Position Horizontal Max
+local HorizontalMaxLabel = Instance.new("TextLabel")
+HorizontalMaxLabel.Name = "HorizontalMaxLabel"
+HorizontalMaxLabel.Size = UDim2.new(0.5, 0, 0, 30)
+HorizontalMaxLabel.Position = UDim2.new(0.05, 0, 0, 170)
+HorizontalMaxLabel.BackgroundTransparency = 1
+HorizontalMaxLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalMaxLabel.TextSize = 14
+HorizontalMaxLabel.Font = Enum.Font.SourceSans
+HorizontalMaxLabel.Text = "Horizontal Max (X/Z):"
+HorizontalMaxLabel.TextXAlignment = Enum.TextXAlignment.Left
+HorizontalMaxLabel.Parent = SubMenuContent
+
+local HorizontalMaxInput = Instance.new("TextBox")
+HorizontalMaxInput.Name = "HorizontalMaxInput"
+HorizontalMaxInput.Size = UDim2.new(0.3, 0, 0, 30)
+HorizontalMaxInput.Position = UDim2.new(0.65, 0, 0, 170)
+HorizontalMaxInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+HorizontalMaxInput.BorderSizePixel = 0
+HorizontalMaxInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+HorizontalMaxInput.TextSize = 14
+HorizontalMaxInput.Font = Enum.Font.SourceSans
+HorizontalMaxInput.Text = "1000"
+HorizontalMaxInput.Parent = SubMenuContent
+
+-- Add UICorner for horizontal max input
+local HorizontalMaxCorner = Instance.new("UICorner")
+HorizontalMaxCorner.CornerRadius = UDim.new(0, 6)
+HorizontalMaxCorner.Parent = HorizontalMaxInput
+
+-- Apply Settings Button
+local ApplySettingsButton = Instance.new("TextButton")
+ApplySettingsButton.Name = "ApplySettingsButton"
+ApplySettingsButton.Size = UDim2.new(0.9, 0, 0, 40)
+ApplySettingsButton.Position = UDim2.new(0.05, 0, 0, 220)
+ApplySettingsButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+ApplySettingsButton.BorderSizePixel = 0
+ApplySettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ApplySettingsButton.TextSize = 16
+ApplySettingsButton.Font = Enum.Font.SourceSansBold
+ApplySettingsButton.Text = "Apply Settings"
+ApplySettingsButton.Parent = SubMenuContent
+
+-- Add UICorner for apply settings button
+local ApplySettingsCorner = Instance.new("UICorner")
+ApplySettingsCorner.CornerRadius = UDim.new(0, 6)
+ApplySettingsCorner.Parent = ApplySettingsButton
+
+-- Notification Frame (New)
+local NotificationFrame = Instance.new("Frame")
+NotificationFrame.Name = "NotificationFrame"
+NotificationFrame.Size = UDim2.new(0, 300, 0, 40)
+NotificationFrame.Position = UDim2.new(0.5, -150, 0, 10)
+NotificationFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+NotificationFrame.BorderSizePixel = 0
+NotificationFrame.Visible = false
+NotificationFrame.ZIndex = 100
+NotificationFrame.Parent = ScreenGui
+
+-- Add UICorner for notification frame
+local NotificationCorner = Instance.new("UICorner")
+NotificationCorner.CornerRadius = UDim.new(0, 8)
+NotificationCorner.Parent = NotificationFrame
+
+local NotificationText = Instance.new("TextLabel")
+NotificationText.Name = "NotificationText"
+NotificationText.Size = UDim2.new(1, 0, 1, 0)
+NotificationText.BackgroundTransparency = 1
+NotificationText.TextColor3 = Color3.fromRGB(255, 255, 255)
+NotificationText.TextSize = 14
+NotificationText.Font = Enum.Font.SourceSansBold
+NotificationText.Text = ""
+NotificationText.ZIndex = 101
+NotificationText.Parent = NotificationFrame
+
+-- Functions
+local function ShowNotification(text, duration)
+    NotificationText.Text = text
+    NotificationFrame.Visible = true
+    
+    spawn(function()
+        wait(duration or 2)
+        NotificationFrame.Visible = false
+    end)
+end
+
+local function CheckExpiration()
+    local currentTime = os.time()
+    local expirationTime = os.time({
+        year = EXPIRATION_DATE.Year,
+        month = EXPIRATION_DATE.Month,
+        day = EXPIRATION_DATE.Day,
+        hour = EXPIRATION_DATE.Hour,
+        min = EXPIRATION_DATE.Minute,
+        sec = EXPIRATION_DATE.Second
+    })
+
+    local timeLeft = expirationTime - currentTime
+
+    if timeLeft <= 0 then
+        -- Script has expired
+        AuthFrame.Visible = false
+        FeaturesFrame.Visible = false
+        ExpiredFrame.Visible = true
+        return true
+    else
+        -- Calculate time left
+        local days = math.floor(timeLeft / 86400)
+        local hours = math.floor((timeLeft % 86400) / 3600)
+        local minutes = math.floor((timeLeft % 3600) / 60)
+        local seconds = timeLeft % 60
+        
+        ExpirationLabel.Text = string.format("Expires in: %d days, %02d:%02d:%02d", days, hours, minutes, seconds)
+        return false
+    end
+end
+
+-- Rainbow border effect
+local function StartRainbowEffect()
+    local colors = {
+        Color3.fromRGB(255, 0, 0),    -- Red
+        Color3.fromRGB(255, 165, 0),  -- Orange
+        Color3.fromRGB(255, 255, 0),  -- Yellow
+        Color3.fromRGB(0, 255, 0),    -- Green
+        Color3.fromRGB(0, 0, 255),    -- Blue
+        Color3.fromRGB(75, 0, 130),   -- Indigo
+        Color3.fromRGB(238, 130, 238) -- Violet
+    }
+
+    local index = 1
+
+    spawn(function()
+        while ScreenGui.Parent do
+            local targetColor = colors[index]
+            local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
+            
+            local mainTween = TweenService:Create(MainStroke, tweenInfo, {Color = targetColor})
+            local iconTween = TweenService:Create(MinimizedIconStroke, tweenInfo, {Color = targetColor})
+            local subMenuTween = TweenService:Create(SubMenuStroke, tweenInfo, {Color = targetColor})
+            
+            mainTween:Play()
+            iconTween:Play()
+            subMenuTween:Play()
+            
+            index = (index % #colors) + 1
+            wait(0.5)
+        end
+    end)
+end
+
+-- Player list functions
+local function PopulatePlayerList()
+    -- Clear existing buttons
+    for _, child in pairs(PlayerScrollFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+
+    -- Clear player list
+    PlayerList = {}
+
+    -- Add all players except local player
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(PlayerList, player)
+            
+            local playerButton = Instance.new("TextButton")
+            playerButton.Name = player.Name .. "Button"
+            playerButton.Size = UDim2.new(0.9, 0, 0, 30)
+            playerButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            playerButton.BorderSizePixel = 0
+            playerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            playerButton.TextSize = 14
+            playerButton.Font = Enum.Font.SourceSans
+            playerButton.Text = player.Name
+            playerButton.ZIndex = 12
+            playerButton.Parent = PlayerScrollFrame
+            
+            -- Add UICorner for player button
+            local playerButtonCorner = Instance.new("UICorner")
+            playerButtonCorner.CornerRadius = UDim.new(0, 4)
+            playerButtonCorner.Parent = playerButton
+            
+            playerButton.MouseButton1Click:Connect(function()
+                TargetPlayer = player
+                TargetDropdown.Text = player.Name
+                DropdownFrame.Visible = false
+                
+                -- Also set as look target
+                LookTarget = player
+                CurrentTargetLabel.Text = "Current Target: " .. player.Name
+                ShowNotification("Target set to: " .. player.Name, 1)
+            end)
+        end
+    end
+
+    -- Update canvas size based on number of players
+    local contentHeight = #PlayerList * 35
+    PlayerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
+end
+
+-- Function to find the nearest player
+local function GetNearestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (player.Character.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance then
+                closestPlayer = player
+                shortestDistance = distance
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- ESP Functions
+local function CreateESPForPlayer(player)
+    if not player or not player.Character or not player.Character:FindFirstChild("Head") then return end
+    
+    -- Remove existing ESP if any
+    if ESPObjects[player] then
+        if ESPObjects[player].Billboard then
+            ESPObjects[player].Billboard:Destroy()
+        end
+    end
+    
+    -- Create new ESP
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP_" .. player.Name
+    billboard.Adornee = player.Character.Head
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = ESPThroughWalls
+    billboard.Parent = workspace
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = ESPTextColor
+    textLabel.TextSize = ESPTextSize
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.TextStrokeTransparency = 0.5
+    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    textLabel.Parent = billboard
+    
+    ESPObjects[player] = {
+        Billboard = billboard,
+        TextLabel = textLabel
+    }
+end
+
+local function UpdateESP()
+    if not ESPEnabled then
+        -- Clear all ESP
+        for player, objects in pairs(ESPObjects) do
+            if objects.Billboard then
+                objects.Billboard:Destroy()
+            end
+        end
+        ESPObjects = {}
+        return
+    end
+    
+    -- Update existing ESP and create new ones
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            -- Create ESP if it doesn't exist
+            if not ESPObjects[player] or not ESPObjects[player].Billboard or not ESPObjects[player].Billboard.Parent then
+                CreateESPForPlayer(player)
+            end
+            
+            -- Update ESP text and properties
+            if ESPObjects[player] and ESPObjects[player].TextLabel then
+                local textLabel = ESPObjects[player].TextLabel
+                local billboard = ESPObjects[player].Billboard
+                
+                -- Update text based on ESP type
+                local text = ""
+                if player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") then
+                    local distance = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")) and 
+                                    (LocalPlayer.Character.Head.Position - player.Character.Head.Position).Magnitude or 0
+                    
+                    if ESPType == "name" then
+                        text = player.Name
+                    elseif ESPType == "hp" then
+                        text = player.Name .. " | HP: " .. math.floor(player.Character.Humanoid.Health)
+                    elseif ESPType == "dist" then
+                        text = player.Name .. " | " .. math.floor(distance) .. "m"
+                    end
+                    
+                    -- Add distance if enabled
+                    if ESPShowDistance and not text:find("m") then
+                        text = text .. " | " .. math.floor(distance) .. "m"
+                    end
+                    
+                    -- Add HP if enabled
+                    if ESPShowHPBool and not text:find("HP") then
+                        text = text .. " | HP: " .. math.floor(player.Character.Humanoid.Health)
+                    end
+                    
+                    textLabel.Text = text
+                    textLabel.TextColor3 = ESPTextColor
+                    textLabel.TextSize = ESPTextSize
+                    billboard.AlwaysOnTop = ESPThroughWalls
+                end
+            end
+        end
+    end
+    
+    -- Remove ESP for players who left
+    for player, objects in pairs(ESPObjects) do
+        if not Players:FindFirstChild(player.Name) then
+            if objects.Billboard then
+                objects.Billboard:Destroy()
+            end
+            ESPObjects[player] = nil
+        end
+    end
+end
+
+-- Toggle noclip function
+local function ToggleNoclip()
+    NoClipping = not NoClipping
+
+    if NoClipping then
+        NoclipButton.Text = "Noclip: ON"
+        NoclipButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        
+        -- Enable noclip
+        local noclipConnection = RunService.Stepped:Connect(function()
+            if Character and NoClipping then
+                for _, part in pairs(Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+        
+        -- Store the connection
+        NoclipButton.NoclipConnection = noclipConnection
+        ShowNotification("Noclip enabled", 1)
+    else
+        NoclipButton.Text = "Noclip: OFF"
+        NoclipButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        
+        -- Disable noclip
+        if NoclipButton.NoclipConnection then
+            NoclipButton.NoclipConnection:Disconnect()
+            NoclipButton.NoclipConnection = nil
+        end
+        
+        -- Reset collision
+        for _, part in pairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+        ShowNotification("Noclip disabled", 1)
+    end
+end
+
+-- Platform function
+local function TogglePlatform()
+    AutoPlatform = not AutoPlatform
+
+    if AutoPlatform then
+        PlatformButton.Text = "Platform: ON"
+        PlatformButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        AutoPlatformCheck.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        
+        -- Create platform
+        local platform = Instance.new("Part")
+        platform.Name = "ExecutorPlatform"
+        platform.Size = Vector3.new(5, 1, 5)
+        platform.Anchored = true
+        platform.CanCollide = true
+        platform.Transparency = 0.5
+        platform.Material = Enum.Material.Neon
+        platform.Color = Color3.fromRGB(0, 120, 255)
+        platform.Parent = workspace
+        
+        -- Platform update loop
+        local platformConnection = RunService.Heartbeat:Connect(function()
+            if AutoPlatform and Character and Character:FindFirstChild("HumanoidRootPart") then
+                platform.CFrame = CFrame.new(HumanoidRootPart.Position.X, HumanoidRootPart.Position.Y - 3.5, HumanoidRootPart.Position.Z)
+            end
+        end)
+        
+        -- Store references
+        PlatformPart = platform
+        PlatformButton.PlatformConnection = platformConnection
+        ShowNotification("Platform enabled", 1)
+    else
+        PlatformButton.Text = "Platform: OFF"
+        PlatformButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        AutoPlatformCheck.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        
+        -- Remove platform
+        if PlatformPart and PlatformPart:IsDescendantOf(workspace) then
+            PlatformPart:Destroy()
+            PlatformPart = nil
+        end
+        
+        -- Disconnect update loop
+        if PlatformButton.PlatformConnection then
+            PlatformButton.PlatformConnection:Disconnect()
+            PlatformButton.PlatformConnection = nil
+        end
+        ShowNotification("Platform disabled", 1)
+    end
+end
+
+-- Follow target function
+local function ToggleFollowTarget()
+    FollowingTarget = not FollowingTarget
+
+    if FollowingTarget then
+        if not TargetPlayer or not TargetPlayer.Character then
+            FollowingTarget = false
+            ShowNotification("No target selected", 1)
+            return
+        end
+        
+        FollowButton.Text = "Follow: ON"
+        FollowButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        
+        -- Get distance values
+        DistanceBehind = tonumber(HorizontalInput.Text) or 5
+        DistanceAbove = tonumber(VerticalInput.Text) or 0
+        
+        -- Follow loop
+        local followConnection = RunService.Heartbeat:Connect(function()
+            if FollowingTarget and TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") and Character and Character:FindFirstChild("HumanoidRootPart") then
+                local targetHRP = TargetPlayer.Character.HumanoidRootPart
+                local targetHumanoid = TargetPlayer.Character:FindFirstChild("Humanoid")
+                
+                -- Check if target is dead and auto next is enabled
+                if AutoNextTarget and targetHumanoid and targetHumanoid.Health <= 0 then
+                    -- Find next target
+                    local foundNext = false
+                    for _, player in pairs(PlayerList) do
+                        if player ~= TargetPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+                            TargetPlayer = player
+                            TargetDropdown.Text = player.Name
+                            foundNext = true
+                            ShowNotification("Auto-switched to: " .. player.Name, 1)
+                            break
+                        end
+                    end
+                    
+                    if not foundNext then
+                        FollowingTarget = false
+                        FollowButton.Text = "Follow: OFF"
+                        FollowButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+                        followConnection:Disconnect()
+                        ShowNotification("No valid targets found", 1)
+                    end
+                else
+                    -- Calculate position behind target
+                    local targetLookVector = targetHRP.CFrame.LookVector
+                    local behindPosition = targetHRP.Position - (targetLookVector * DistanceBehind)
+                    behindPosition = behindPosition + Vector3.new(0, DistanceAbove, 0)
+                    
+                    -- Teleport behind target
+                    HumanoidRootPart.CFrame = CFrame.new(behindPosition, targetHRP.Position)
+                end
+            end
+        end)
+        
+        -- Store connection
+        FollowButton.FollowConnection = followConnection
+        ShowNotification("Following: " .. TargetPlayer.Name, 1)
+    else
+        FollowButton.Text = "Follow: OFF"
+        FollowButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        
+        -- Disconnect follow loop
+        if FollowButton.FollowConnection then
+            FollowButton.FollowConnection:Disconnect()
+            FollowButton.FollowConnection = nil
+        end
+        ShowNotification("Follow disabled", 1)
+    end
+end
+
+-- Run away function
+local function ToggleRunAway()
+    RunningAway = not RunningAway
+
+    if RunningAway then
+        RunButton.Text = "Run Away: ON"
+        RunButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        RunAwayCheck.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        
+        -- Get detection radius
+        DetectionRadius = tonumber(RadiusInput.Text) or 20
+        
+        -- Run away loop
+        local runConnection = RunService.Heartbeat:Connect(function()
+            if RunningAway and Character and Character:FindFirstChild("HumanoidRootPart") then
+                -- Check for nearby players
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        local distance = (HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                        
+                        if distance <= DetectionRadius then
+                            -- Calculate escape position (100 studs away in opposite direction)
+                            local direction = (HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Unit
+                            local escapePosition = HumanoidRootPart.Position + direction * 100
+                            
+                            -- Teleport to escape position
+                            HumanoidRootPart.CFrame = CFrame.new(escapePosition, escapePosition + HumanoidRootPart.CFrame.LookVector)
+                            break
+                        end
+                    end
+                end
+            end
+        end)
+        
+        -- Store connection
+        RunButton.RunConnection = runConnection
+        ShowNotification("Run Away enabled (Radius: " .. DetectionRadius .. ")", 1)
+    else
+        RunButton.Text = "Run Away: OFF"
+        RunButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        RunAwayCheck.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        
+        -- Disconnect run away loop
+        if RunButton.RunConnection then
+            RunButton.RunConnection:Disconnect()
+            RunButton.RunConnection = nil
+        end
+        ShowNotification("Run Away disabled", 1)
+    end
+end
+
+-- Toggle auto next target
+local function ToggleAutoNext()
+    AutoNextTarget = not AutoNextTarget
+
+    if AutoNextTarget then
+        NextButton.Text = "Auto Next: ON"
+        NextButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        AutoNextCheck.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        ShowNotification("Auto Next Target enabled", 1)
+    else
+        NextButton.Text = "Auto Next: OFF"
+        NextButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        AutoNextCheck.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        ShowNotification("Auto Next Target disabled", 1)
+    end
+end
+
+-- Save current position
+local function SaveCurrentPosition()
+    if Character and Character:FindFirstChild("HumanoidRootPart") then
+        SavedPosition = HumanoidRootPart.CFrame
+        ShowNotification("Position saved!", 1)
+    else
+        ShowNotification("Cannot save position - character not found", 1)
+    end
+end
+
+-- Teleport to saved position
+local function TeleportToSavedPosition()
+    if SavedPosition and Character and Character:FindFirstChild("HumanoidRootPart") then
+        HumanoidRootPart.CFrame = SavedPosition
+        ShowNotification("Teleported to saved position", 1)
+    else
+        ShowNotification("No position saved!", 1)
+    end
+end
+
+-- Toggle auto check position
+local function ToggleAutoCheckPosition()
+    AutoCheckPosition = not AutoCheckPosition
+
+    if AutoCheckPosition then
+        AutoCheckButton.Text = "ON"
+        AutoCheckButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        
+        -- Get safe position boundaries
+        local verticalMin = tonumber(VerticalMinInput.Text) or -1000
+        local verticalMax = tonumber(VerticalMaxInput.Text) or 1000
+        local horizontalMin = tonumber(HorizontalMinInput.Text) or -1000
+        local horizontalMax = tonumber(HorizontalMaxInput.Text) or 1000
+        
+        SafePositionMin = Vector3.new(horizontalMin, verticalMin, horizontalMin)
+        SafePositionMax = Vector3.new(horizontalMax, verticalMax, horizontalMax)
+        
+        -- Auto check loop
+        local checkConnection = RunService.Heartbeat:Connect(function()
+            if AutoCheckPosition and Character and Character:FindFirstChild("HumanoidRootPart") then
+                local pos = HumanoidRootPart.Position
+                local lastSafePosition = HumanoidRootPart.CFrame
+                
+                -- Check if position is outside safe boundaries
+                if pos.Y < SafePositionMin.Y or pos.Y > SafePositionMax.Y or
+                   pos.X < SafePositionMin.X or pos.X > SafePositionMax.X or
+                   pos.Z < SafePositionMin.Z or pos.Z > SafePositionMax.Z then
+                    
+                    -- If we have a saved position, teleport to it
+                    if SavedPosition then
+                        HumanoidRootPart.CFrame = SavedPosition
+                    else
+                        -- Otherwise, try to move back to a safe position
+                        local safeY = math.clamp(pos.Y, SafePositionMin.Y, SafePositionMax.Y)
+                        local safeX = math.clamp(pos.X, SafePositionMin.X, SafePositionMax.X)
+                        local safeZ = math.clamp(pos.Z, SafePositionMin.Z, SafePositionMax.Z)
+                        
+                        HumanoidRootPart.CFrame = CFrame.new(safeX, safeY, safeZ, HumanoidRootPart.CFrame:GetComponents())
+                    end
+                else
+                    -- Update last safe position
+                    AutoCheckButton.LastSafePosition = lastSafePosition
+                end
+            end
+        end)
+        
+        -- Store connection
+        AutoCheckButton.CheckConnection = checkConnection
+        ShowNotification("Auto Check Position enabled", 1)
+    else
+        AutoCheckButton.Text = "OFF"
+        AutoCheckButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        
+        -- Disconnect auto check loop
+        if AutoCheckButton.CheckConnection then
+            AutoCheckButton.CheckConnection:Disconnect()
+            AutoCheckButton.CheckConnection = nil
+        end
+        ShowNotification("Auto Check Position disabled", 1)
+    end
+end
+
+-- Apply safety settings
+local function ApplySafetySettings()
+    -- Get values from inputs
+    local verticalMin = tonumber(VerticalMinInput.Text) or -1000
+    local verticalMax = tonumber(VerticalMaxInput.Text) or 1000
+    local horizontalMin = tonumber(HorizontalMinInput.Text) or -1000
+    local horizontalMax = tonumber(HorizontalMaxInput.Text) or 1000
+
+    -- Update safe position boundaries
+    SafePositionMin = Vector3.new(horizontalMin, verticalMin, horizontalMin)
+    SafePositionMax = Vector3.new(horizontalMax, verticalMax, horizontalMax)
+
+    ShowNotification("Safety settings applied", 1)
+
+    -- If auto check is on, restart it with new settings
+    if AutoCheckPosition then
+        if AutoCheckButton.CheckConnection then
+            AutoCheckButton.CheckConnection:Disconnect()
+            AutoCheckButton.CheckConnection = nil
+        end
+        ToggleAutoCheckPosition()
+        ToggleAutoCheckPosition()
+    end
+end
+
+-- Toggle submenu
+local function ToggleSubMenu()
+    SubMenuVisible = not SubMenuVisible
+    SubMenuFrame.Visible = SubMenuVisible
+end
+
+-- Limit dragging to screen bounds
+local function LimitDragging()
+    local screenSize = workspace.CurrentCamera.ViewportSize
+    local frameSize = MainFrame.AbsoluteSize
+    local minX = 0
+    local minY = 0
+    local maxX = screenSize.X - frameSize.X
+    local maxY = screenSize.Y - frameSize.Y
+
+    local newX = math.clamp(MainFrame.AbsolutePosition.X, minX, maxX)
+    local newY = math.clamp(MainFrame.AbsolutePosition.Y, minY, maxY)
+
+    if MainFrame.AbsolutePosition.X ~= newX or MainFrame.AbsolutePosition.Y ~= newY then
+        MainFrame.Position = UDim2.new(0, newX, 0, newY)
+    end
+end
+
+local function LimitIconDragging()
+    local screenSize = workspace.CurrentCamera.ViewportSize
+    local iconSize = MinimizedIcon.AbsoluteSize
+    local minX = 0
+    local minY = 0
+    local maxX = screenSize.X - iconSize.X
+    local maxY = screenSize.Y - iconSize.Y
+
+    local newX = math.clamp(MinimizedIcon.AbsolutePosition.X, minX, maxX)
+    local newY = math.clamp(MinimizedIcon.AbsolutePosition.Y, minY, maxY)
+
+    if MinimizedIcon.AbsolutePosition.X ~= newX or MinimizedIcon.AbsolutePosition.Y ~= newY then
+        MinimizedIcon.Position = UDim2.new(0, newX, 0, newY)
+    end
+end
+
+local function LimitSubMenuDragging()
+    local screenSize = workspace.CurrentCamera.ViewportSize
+    local frameSize = SubMenuFrame.AbsoluteSize
+    local minX = 0
+    local minY = 0
+    local maxX = screenSize.X - frameSize.X
+    local maxY = screenSize.Y - frameSize.Y
+
+    local newX = math.clamp(SubMenuFrame.AbsolutePosition.X, minX, maxX)
+    local newY = math.clamp(SubMenuFrame.AbsolutePosition.Y, minY, maxY)
+
+    if SubMenuFrame.AbsolutePosition.X ~= newX or SubMenuFrame.AbsolutePosition.Y ~= newY then
+        SubMenuFrame.Position = UDim2.new(0, newX, 0, newY)
+    end
+end
+
+-- Toggle look at player function
+local function ToggleLookAtPlayer()
+    LookingAtPlayer = not LookingAtPlayer
+    
+    if LookingAtPlayer then
+        if not LookTarget then
+            LookTarget = TargetPlayer
+            if LookTarget then
+                CurrentTargetLabel.Text = "Current Target: " .. LookTarget.Name
+            end
+        end
+        
+        if not LookTarget then
+            LookingAtPlayer = false
+            ShowNotification("No target selected for Look At", 1)
+            return
+        end
+        
+        LookAtButton.Text = "Look At: ON"
+        LookAtButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        
+        -- Create look at connection
+        local lookConnection = RunService.RenderStepped:Connect(function()
+            if LookingAtPlayer and LookTarget and LookTarget.Character and LookTarget.Character:FindFirstChild(LookBodyPart) and Camera then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, LookTarget.Character[LookBodyPart].Position)
+            end
+        end)
+        
+        -- Store connection
+        LookAtButton.LookConnection = lookConnection
+        ShowNotification("Looking at: " .. LookTarget.Name .. " (" .. LookBodyPart .. ")", 1)
+    else
+        LookAtButton.Text = "Look At: OFF"
+        LookAtButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        
+        -- Disconnect look connection
+        if LookAtButton.LookConnection then
+            LookAtButton.LookConnection:Disconnect()
+            LookAtButton.LookConnection = nil
+        end
+        ShowNotification("Look At disabled", 1)
+    end
+end
+
+-- Cycle through body parts
+local function CycleBodyPart()
+    BodyPartIndex = (BodyPartIndex % #BodyParts) + 1
+    LookBodyPart = BodyParts[BodyPartIndex]
+    BodyPartButton.Text = "Part: " .. LookBodyPart
+    ShowNotification("Looking at body part: " .. LookBodyPart, 1)
+end
+
+-- Teleport behind target
+local function TeleportBehindTarget()
+    local target = LookTarget or TargetPlayer
+    
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and Character and Character:FindFirstChild("HumanoidRootPart") then
+        local targetHRP = target.Character.HumanoidRootPart
+        local lookVector = targetHRP.CFrame.LookVector
+        local teleportPosition = targetHRP.Position - (lookVector * DistanceBehind) + Vector3.new(0, DistanceAbove, 0)
+        
+        -- Teleport behind target
+        HumanoidRootPart.CFrame = CFrame.new(teleportPosition, targetHRP.Position)
+        ShowNotification("Teleported behind " .. target.Name, 1)
+    else
+        ShowNotification("No target selected!", 1)
+    end
+end
+
+-- Toggle ESP
+local function ToggleESP()
+    ESPEnabled = not ESPEnabled
+    ESPToggleButton.Text = "ESP: " .. (ESPEnabled and "ON" or "OFF")
+    ESPToggleButton.BackgroundColor3 = ESPEnabled and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(0, 120, 215)
+    ShowNotification("ESP: " .. (ESPEnabled and "enabled" or "disabled"), 1)
+end
+
+-- Cycle ESP Type
+local function CycleESPType()
+    if ESPType == "name" then
+        ESPType = "hp"
+    elseif ESPType == "hp" then
+        ESPType = "dist"
+    else
+        ESPType = "name"
+    end
+    
+    ESPTypeDropdown.Text = "Type: " .. ESPType:sub(1,1):upper() .. ESPType:sub(2)
+    ShowNotification("ESP Type: " .. ESPType, 1)
+end
+
+-- Toggle ESP Through Walls
+local function ToggleESPThroughWalls()
+    ESPThroughWalls = not ESPThroughWalls
+    ESPWallsToggle.Text = "Through Walls: " .. (ESPThroughWalls and "ON" or "OFF")
+    ESPWallsToggle.BackgroundColor3 = ESPThroughWalls and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(60, 60, 60)
+    ShowNotification("ESP Through Walls: " .. (ESPThroughWalls and "enabled" or "disabled"), 1)
+end
+
+-- Toggle ESP Show Distance
+local function ToggleESPDistance()
+    ESPShowDistance = not ESPShowDistance
+    ESPDistanceToggle.Text = "Show Distance: " .. (ESPShowDistance and "ON" or "OFF")
+    ESPDistanceToggle.BackgroundColor3 = ESPShowDistance and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(60, 60, 60)
+    ShowNotification("ESP Show Distance: " .. (ESPShowDistance and "enabled" or "disabled"), 1)
+end
+
+-- Auto AFK Function
+local function ToggleAutoAFK()
+    AutoAFKEnabled = not AutoAFKEnabled
+    ShowNotification("Auto AFK: " .. (AutoAFKEnabled and "enabled" or "disabled"), 1)
+    
+    if AutoAFKEnabled then
+        spawn(function()
+            while AutoAFKEnabled do
+                -- Simulate random movement to prevent AFK kick
+                game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                wait(0.1)
+                game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                wait(60) -- Wait 60 seconds before next anti-AFK action
+            end
+        end)
+    end
+end
+
+-- Event Connections
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+
+    -- Clean up
+    if NoClipping then ToggleNoclip() end
+    if AutoPlatform then TogglePlatform() end
+    if FollowingTarget then ToggleFollowTarget() end
+    if RunningAway then ToggleRunAway() end
+    if AutoCheckPosition then ToggleAutoCheckPosition() end
+    if LookingAtPlayer then ToggleLookAtPlayer() end
+    
+    -- Clear ESP
+    for player, objects in pairs(ESPObjects) do
+        if objects.Billboard then
+            objects.Billboard:Destroy()
+        end
+    end
+end)
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    Minimized = true
+    MainFrame.Visible = false
+    MinimizedIcon.Visible = true
+    ShowNotification("GUI minimized", 1)
+end)
+
+MinimizedIcon.MouseButton1Click:Connect(function()
+    Minimized = false
+    MainFrame.Visible = true
+    MinimizedIcon.Visible = false
+end)
+
+SubMenuButton.MouseButton1Click:Connect(function()
+    ToggleSubMenu()
+end)
+
+SubMenuCloseButton.MouseButton1Click:Connect(function()
+    SubMenuFrame.Visible = false
+    SubMenuVisible = false
+end)
+
+-- Ensure draggable frames stay within screen bounds
+RunService.RenderStepped:Connect(function()
+    if MainFrame.Visible then LimitDragging() end
+    if MinimizedIcon.Visible then LimitIconDragging() end
+    if SubMenuFrame.Visible then LimitSubMenuDragging() end
+    
+    -- Update ESP
+    UpdateESP()
+end)
+
+SubmitButton.MouseButton1Click:Connect(function()
+    if KeyInput.Text == KEY then
+        Authenticated = true
+        AuthFrame.Visible = false
+        FeaturesFrame.Visible = true
+        PopulatePlayerList() -- Initialize player list
+        ShowNotification("Authentication successful", 1.5)
+    else
+        KeyInput.Text = ""
+        KeyInput.PlaceholderText = "Invalid Key! Try Again..."
+        ShowNotification("Invalid key", 1)
+    end
+end)
+
+TargetDropdown.MouseButton1Click:Connect(function()
+    DropdownFrame.Visible = not DropdownFrame.Visible
+end)
+
+ReloadButton.MouseButton1Click:Connect(function()
+    PopulatePlayerList()
+    ShowNotification("Player list reloaded", 1)
+end)
+
+FollowButton.MouseButton1Click:Connect(function()
+    ToggleFollowTarget()
+end)
+
+NextButton.MouseButton1Click:Connect(function()
+    ToggleAutoNext()
+end)
+
+NoclipButton.MouseButton1Click:Connect(function()
+    ToggleNoclip()
+end)
+
+PlatformButton.MouseButton1Click:Connect(function()
+    TogglePlatform()
+end)
+
+RunButton.MouseButton1Click:Connect(function()
+    ToggleRunAway()
+end)
+
+SavePositionButton.MouseButton1Click:Connect(function()
+    SaveCurrentPosition()
+end)
+
+TeleportToSavedButton.MouseButton1Click:Connect(function()
+    TeleportToSavedPosition()
+end)
+
+AutoCheckButton.MouseButton1Click:Connect(function()
+    ToggleAutoCheckPosition()
+end)
+
+ApplySettingsButton.MouseButton1Click:Connect(function()
+    ApplySafetySettings()
+end)
+
+-- Distance control buttons
+HorizontalPlus.MouseButton1Click:Connect(function()
+    local currentValue = tonumber(HorizontalInput.Text) or 5
+    HorizontalInput.Text = tostring(currentValue + 0.5)
+    DistanceBehind = currentValue + 0.5
+end)
+
+HorizontalMinus.MouseButton1Click:Connect(function()
+    local currentValue = tonumber(HorizontalInput.Text) or 5
+    HorizontalInput.Text = tostring(math.max(0, currentValue - 0.5))
+    DistanceBehind = math.max(0, currentValue - 0.5)
+end)
+
+VerticalPlus.MouseButton1Click:Connect(function()
+    local currentValue = tonumber(VerticalInput.Text) or 0
+    VerticalInput.Text = tostring(currentValue + 0.5)
+    DistanceAbove = currentValue + 0.5
+end)
+
+VerticalMinus.MouseButton1Click:Connect(function()
+    local currentValue = tonumber(VerticalInput.Text) or 0
+    VerticalInput.Text = tostring(currentValue - 0.5)
+    DistanceAbove = currentValue - 0.5
+end)
+
+RadiusPlus.MouseButton1Click:Connect(function()
+    local currentValue = tonumber(RadiusInput.Text) or 20
+    RadiusInput.Text = tostring(currentValue + 5)
+    DetectionRadius = currentValue + 5
+end)
+
+RadiusMinus.MouseButton1Click:Connect(function()
+    local currentValue = tonumber(RadiusInput.Text) or 20
+    RadiusInput.Text = tostring(math.max(5, currentValue - 5))
+    DetectionRadius = math.max(5, currentValue - 5)
+end)
+
+-- Checkbox toggles
+AutoNextCheck.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        ToggleAutoNext()
+    end
+end)
+
+AutoPlatformCheck.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        TogglePlatform()
+    end
+end)
+
+RunAwayCheck.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        ToggleRunAway()
+    end
+end)
+
+DeleteButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Text input validation
+HorizontalInput.FocusLost:Connect(function()
+    local value = tonumber(HorizontalInput.Text)
+    if value then
+        DistanceBehind = value
+    else
+        HorizontalInput.Text = tostring(DistanceBehind)
+    end
+end)
+
+VerticalInput.FocusLost:Connect(function()
+    local value = tonumber(VerticalInput.Text)
+    if value then
+        DistanceAbove = value
+    else
+        VerticalInput.Text = tostring(DistanceAbove)
+    end
+end)
+
+RadiusInput.FocusLost:Connect(function()
+    local value = tonumber(RadiusInput.Text)
+    if value and value >= 5 then
+        DetectionRadius = value
+    else
+        RadiusInput.Text = tostring(DetectionRadius)
+    end
+end)
+
+-- Safe position input validation
+VerticalMinInput.FocusLost:Connect(function()
+    local value = tonumber(VerticalMinInput.Text)
+    if value then
+        SafePositionMin = Vector3.new(SafePositionMin.X, value, SafePositionMin.Z)
+    else
+        VerticalMinInput.Text = tostring(SafePositionMin.Y)
+    end
+end)
+
+VerticalMaxInput.FocusLost:Connect(function()
+    local value = tonumber(VerticalMaxInput.Text)
+    if value then
+        SafePositionMax = Vector3.new(SafePositionMax.X, value, SafePositionMax.Z)
+    else
+        VerticalMaxInput.Text = tostring(SafePositionMax.Y)
+    end
+end)
+
+HorizontalMinInput.FocusLost:Connect(function()
+    local value = tonumber(HorizontalMinInput.Text)
+    if value then
+        SafePositionMin = Vector3.new(value, SafePositionMin.Y, value)
+    else
+        HorizontalMinInput.Text = tostring(SafePositionMin.X)
+    end
+end)
+
+HorizontalMaxInput.FocusLost:Connect(function()
+    local value = tonumber(HorizontalMaxInput.Text)
+    if value then
+        SafePositionMax = Vector3.new(value, SafePositionMax.Y, value)
+    else
+        HorizontalMaxInput.Text = tostring(SafePositionMax.X)
+    end
+end)
+
+-- Look At Player button
+LookAtButton.MouseButton1Click:Connect(function()
+    ToggleLookAtPlayer()
+end)
+
+-- Body Part button
+BodyPartButton.MouseButton1Click:Connect(function()
+    CycleBodyPart()
+end)
+
+-- Nearest Player button
+NearestPlayerButton.MouseButton1Click:Connect(function()
+    local nearestPlayer = GetNearestPlayer()
+    if nearestPlayer then
+        LookTarget = nearestPlayer
+        TargetPlayer = nearestPlayer
+        TargetDropdown.Text = nearestPlayer.Name
+        CurrentTargetLabel.Text = "Current Target: " .. nearestPlayer.Name
+        ShowNotification("Selected nearest player: " .. nearestPlayer.Name, 1)
+    else
+        ShowNotification("No nearby players found", 1)
+    end
+end)
+
+-- Teleport Behind button
+TeleportBehindButton.MouseButton1Click:Connect(function()
+    TeleportBehindTarget()
+end)
+
+-- ESP Buttons
+ESPToggleButton.MouseButton1Click:Connect(function()
+    ToggleESP()
+end)
+
+ESPTypeDropdown.MouseButton1Click:Connect(function()
+    CycleESPType()
+end)
+
+ESPWallsToggle.MouseButton1Click:Connect(function()
+    ToggleESPThroughWalls()
+end)
+
+ESPDistanceToggle.MouseButton1Click:Connect(function()
+    ToggleESPDistance()
+end)
+
+ESPColorInput.FocusLost:Connect(function()
+    local colorText = ESPColorInput.Text
+    if colorText:match("^#%x%x%x%x%x%x$") then
+        -- Convert hex to RGB
+        local r = tonumber("0x" .. colorText:sub(2, 3)) / 255
+        local g = tonumber("0x" .. colorText:sub(4, 5)) / 255
+        local b = tonumber("0x" .. colorText:sub(6, 7)) / 255
+        ESPTextColor = Color3.new(r, g, b)
+        ShowNotification("ESP color updated", 1)
+    else
+        ESPColorInput.Text = "#FFFFFF"
+        ShowNotification("Invalid color format. Use #RRGGBB", 1)
+    end
+end)
+
+ESPSizeInput.FocusLost:Connect(function()
+    local size = tonumber(ESPSizeInput.Text)
+    if size and size >= 8 and size <= 32 then
+        ESPTextSize = size
+        ShowNotification("ESP text size updated to " .. size, 1)
+    else
+        ESPSizeInput.Text = "16"
+        ESPTextSize = 16
+        ShowNotification("Invalid size. Using default (16)", 1)
+    end
+end)
+
+-- Check expiration on a timer
+local expirationChecker = task.spawn(function()
+    while task.wait(1) do
+        if CheckExpiration() then
+            break
+        end
+    end
+end)
+
+-- Character respawn handling
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    Character = newCharacter
+    Humanoid = Character:WaitForChild("Humanoid")
+    HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+    -- Reset states if needed
+    if NoClipping then
+        ToggleNoclip()
+        task.wait(0.5)
+        ToggleNoclip()
+    end
+
+    if AutoPlatform then
+        TogglePlatform()
+        task.wait(0.5)
+        TogglePlatform()
+    end
+
+    if FollowingTarget then
+        ToggleFollowTarget()
+        task.wait(0.5)
+        ToggleFollowTarget()
+    end
+
+    if RunningAway then
+        ToggleRunAway()
+        task.wait(0.5)
+        ToggleRunAway()
+    end
+
+    if AutoCheckPosition then
+        ToggleAutoCheckPosition()
+        task.wait(0.5)
+        ToggleAutoCheckPosition()
+    end
+
+    -- Reset look at player if needed
+    if LookingAtPlayer then
+        ToggleLookAtPlayer()
+        task.wait(0.5)
+        ToggleLookAtPlayer()
+    end
+end)
+
+-- Player joining/leaving handling
+Players.PlayerAdded:Connect(function(player)
+    if Authenticated then
+        PopulatePlayerList()
+        
+        -- Update ESP
+        if ESPEnabled then
+            CreateESPForPlayer(player)
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if Authenticated then
+        -- Check if removed player was the target
+        if TargetPlayer == player then
+            TargetPlayer = nil
+            TargetDropdown.Text = "Select Target"
+            
+            -- Turn off following if target left
+            if FollowingTarget then
+                ToggleFollowTarget()
+            end
+        end
+        
+        -- Remove ESP
+        if ESPObjects[player] then
+            if ESPObjects[player].Billboard then
+                ESPObjects[player].Billboard:Destroy()
+            end
+            ESPObjects[player] = nil
+        end
+        
+        PopulatePlayerList()
+    end
+end)
+
+-- Start rainbow effect
+StartRainbowEffect()
+
+-- Initial expiration check
+CheckExpiration()
+
+-- Initialize ESP
+if ESPEnabled then
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            CreateESPForPlayer(player)
+        end
+    end
+end
+
+print("Roblox Executor Script loaded successfully!")
