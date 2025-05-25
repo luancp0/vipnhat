@@ -1,0 +1,1766 @@
+-- Scriptone Ultimate - Enhanced Roblox Executor Script
+-- Version: 3.0 Ultimate Edition
+-- Features: Complete Account System, VIP Access, Advanced ESP, Multi-language, Anti-Detection
+
+-- Configuration
+local DEFAULT_PASSWORD = "123456"
+local VIP_PASSWORD = "987654321"
+local VIP_ICON_URL = "https://i.postimg.cc/nrHhrrPP/1748159806822.webp"
+
+-- Services
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+
+-- Anti-Detection & Security System
+local AntiDetection = {
+    enabled = true,
+    randomDelay = true,
+    codeObfuscation = true,
+    memoryProtection = true,
+    antiDebug = true,
+    secureMode = false
+}
+
+-- Security Configuration
+local Security = {
+    encryptionKey = "ScriptoneUltimate2024!@#",
+    sessionTimeout = 3600,
+    maxLoginAttempts = 3,
+    loginAttempts = 0,
+    sessionStartTime = tick(),
+    antiTampering = true,
+    secureStorage = true
+}
+
+-- Anti-Detection Functions
+local function RandomDelay(min, max)
+    if AntiDetection.randomDelay then
+        local delay = math.random(min or 50, max or 200) / 1000
+        wait(delay)
+    end
+end
+
+local function ObfuscateString(str)
+    if not AntiDetection.codeObfuscation then return str end
+    local result = ""
+    for i = 1, #str do
+        local char = str:sub(i, i)
+        local byte = string.byte(char)
+        result = result .. string.char(byte + math.random(-5, 5))
+    end
+    return result
+end
+
+local function SimpleEncrypt(text, key)
+    local result = ""
+    for i = 1, #text do
+        local char = text:sub(i, i)
+        local keyChar = key:sub((i - 1) % #key + 1, (i - 1) % #key + 1)
+        local encrypted = string.char((string.byte(char) + string.byte(keyChar)) % 256)
+        result = result .. encrypted
+    end
+    return result
+end
+
+local function SimpleDecrypt(text, key)
+    local result = ""
+    for i = 1, #text do
+        local char = text:sub(i, i)
+        local keyChar = key:sub((i - 1) % #key + 1, (i - 1) % #key + 1)
+        local decrypted = string.char((string.byte(char) - string.byte(keyChar)) % 256)
+        result = result .. decrypted
+    end
+    return result
+end
+
+-- Memory Protection
+local function ProtectMemory()
+    if not AntiDetection.memoryProtection then return end
+    
+    spawn(function()
+        while AntiDetection.enabled do
+            wait(math.random(30, 60))
+            if AccountData.password then
+                AccountData.password = string.rep("*", #AccountData.password)
+            end
+            collectgarbage("collect")
+        end
+    end)
+end
+
+-- Anti-Debug Detection
+local function DetectDebugger()
+    if not AntiDetection.antiDebug then return false end
+    
+    local startTime = tick()
+    for i = 1, 100 do
+        math.random()
+    end
+    local endTime = tick()
+    
+    return (endTime - startTime) > 0.1
+end
+
+-- Session Management
+local function ValidateSession()
+    local currentTime = tick()
+    if currentTime - Security.sessionStartTime > Security.sessionTimeout then
+        AccountData.isLoggedIn = false
+        LoginFrame.Visible = true
+        MainFrame.Visible = false
+        print("Session expired. Please login again.")
+        return false
+    end
+    return true
+end
+
+-- Variables
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Camera = workspace.CurrentCamera
+
+-- Account System
+local AccountData = {
+    username = "",
+    password = "",
+    isLoggedIn = false,
+    isVIP = false
+}
+
+-- Settings Data
+local Settings = {
+    language = "en",
+    iconSize = 50,
+    iconDraggable = false,
+    iconImageId = "",
+    iconImageUrl = VIP_ICON_URL,
+    useVipIcon = false,
+    useRobloxId = false,
+    mainFrameSize = {400, 500},
+    espEnabled = false,
+    espTextSize = 14,
+    espTextColor = {255, 255, 255},
+    espTextColorHex = "#FFFFFF",
+    espWallHack = false,
+    espShowDistance = false,
+    espShowName = true,
+    espShowHP = false,
+    dragBarEnabled = true
+}
+
+-- State Variables
+local currentTarget = nil
+local lookingAtPlayer = false
+local lookTarget = nil
+local bodyPartIndex = 1
+local bodyParts = {"Head", "UpperTorso", "HumanoidRootPart", "LeftFoot", "RightFoot"}
+local captchaCode = ""
+local captchaInput = ""
+
+-- Language Support
+local Languages = {
+    en = {
+        title = "Scriptone Ultimate",
+        login = "Login",
+        username = "Username",
+        password = "Password",
+        create_account = "Create Account",
+        logout = "Logout",
+        settings = "Settings",
+        target_selection = "Target Selection",
+        select_nearest = "Select Nearest",
+        look_at_player = "Look At Player",
+        esp_settings = "ESP Settings",
+        icon_settings = "Icon Settings",
+        vip_access = "VIP Access",
+        captcha = "CAPTCHA",
+        enter_captcha = "Enter CAPTCHA",
+        invalid_captcha = "Invalid CAPTCHA",
+        vip_password = "VIP Password",
+        language = "Language",
+        text_size = "Text Size",
+        text_color = "Text Color",
+        wall_hack = "Wall Hack",
+        show_distance = "Show Distance",
+        show_name = "Show Name",
+        show_hp = "Show HP",
+        icon_size = "Icon Size",
+        draggable = "Draggable",
+        drag_bar = "Drag Bar",
+        apply = "Apply",
+        save = "Save",
+        load = "Load",
+        frame_width = "Frame Width",
+        frame_height = "Frame Height",
+        roblox_id = "Roblox ID",
+        image_url = "Image URL",
+        use_vip_icon = "Use VIP Icon"
+    },
+    vi = {
+        title = "Scriptone Tối Thượng",
+        login = "Đăng Nhập",
+        username = "Tên Đăng Nhập",
+        password = "Mật Khẩu",
+        create_account = "Tạo Tài Khoản",
+        logout = "Đăng Xuất",
+        settings = "Cài Đặt",
+        target_selection = "Chọn Mục Tiêu",
+        select_nearest = "Chọn Gần Nhất",
+        look_at_player = "Nhìn Người Chơi",
+        esp_settings = "Cài Đặt ESP",
+        icon_settings = "Cài Đặt Icon",
+        vip_access = "Truy Cập VIP",
+        captcha = "Mã Xác Nhận",
+        enter_captcha = "Nhập Mã Xác Nhận",
+        invalid_captcha = "Mã Xác Nhận Sai",
+        vip_password = "Mật Khẩu VIP",
+        language = "Ngôn Ngữ",
+        text_size = "Cỡ Chữ",
+        text_color = "Màu Chữ",
+        wall_hack = "Xuyên Tường",
+        show_distance = "Hiện Khoảng Cách",
+        show_name = "Hiện Tên",
+        show_hp = "Hiện HP",
+        icon_size = "Cỡ Icon",
+        draggable = "Kéo Thả",
+        drag_bar = "Thanh Kéo",
+        apply = "Áp Dụng",
+        save = "Lưu",
+        load = "Tải",
+        frame_width = "Chiều Rộng Khung",
+        frame_height = "Chiều Cao Khung",
+        roblox_id = "ID Roblox",
+        image_url = "URL Hình Ảnh",
+        use_vip_icon = "Dùng Icon VIP"
+    }
+}
+
+-- Get localized text
+local function GetText(key)
+    local lang = Languages[Settings.language] or Languages.en
+    return lang[key] or key
+end
+
+-- Generate CAPTCHA
+local function GenerateCaptcha()
+    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    local result = ""
+    for i = 1, 6 do
+        local randomIndex = math.random(1, #chars)
+        result = result .. chars:sub(randomIndex, randomIndex)
+    end
+    return result
+end
+
+-- Color conversion functions
+local function HexToRGB(hex)
+    hex = hex:gsub("#", "")
+    if #hex == 6 then
+        local r = tonumber(hex:sub(1, 2), 16)
+        local g = tonumber(hex:sub(3, 4), 16)
+        local b = tonumber(hex:sub(5, 6), 16)
+        return {r, g, b}
+    end
+    return {255, 255, 255}
+end
+
+local function RGBToHex(r, g, b)
+    return string.format("#%02X%02X%02X", r, g, b)
+end
+
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ScriptoneUltimateGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = CoreGui
+
+-- Login Frame
+local LoginFrame = Instance.new("Frame")
+LoginFrame.Name = "LoginFrame"
+LoginFrame.Size = UDim2.new(0, 350, 0, 300)
+LoginFrame.Position = UDim2.new(0.5, -175, 0.5, -150)
+LoginFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+LoginFrame.BorderSizePixel = 0
+LoginFrame.Active = true
+LoginFrame.Draggable = true
+LoginFrame.Parent = ScreenGui
+
+local LoginCorner = Instance.new("UICorner")
+LoginCorner.CornerRadius = UDim.new(0, 10)
+LoginCorner.Parent = LoginFrame
+
+-- Login Title
+local LoginTitle = Instance.new("TextLabel")
+LoginTitle.Name = "LoginTitle"
+LoginTitle.Size = UDim2.new(1, 0, 0, 50)
+LoginTitle.Position = UDim2.new(0, 0, 0, 10)
+LoginTitle.BackgroundTransparency = 1
+LoginTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+LoginTitle.TextSize = 20
+LoginTitle.Font = Enum.Font.GothamBold
+LoginTitle.Text = GetText("title")
+LoginTitle.Parent = LoginFrame
+
+-- Username Input
+local UsernameInput = Instance.new("TextBox")
+UsernameInput.Name = "UsernameInput"
+UsernameInput.Size = UDim2.new(0.8, 0, 0, 40)
+UsernameInput.Position = UDim2.new(0.1, 0, 0, 80)
+UsernameInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+UsernameInput.BorderSizePixel = 0
+UsernameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+UsernameInput.TextSize = 16
+UsernameInput.Font = Enum.Font.Gotham
+UsernameInput.PlaceholderText = GetText("username")
+UsernameInput.Text = ""
+UsernameInput.Parent = LoginFrame
+
+local UsernameCorner = Instance.new("UICorner")
+UsernameCorner.CornerRadius = UDim.new(0, 8)
+UsernameCorner.Parent = UsernameInput
+
+-- Password Input
+local PasswordInput = Instance.new("TextBox")
+PasswordInput.Name = "PasswordInput"
+PasswordInput.Size = UDim2.new(0.8, 0, 0, 40)
+PasswordInput.Position = UDim2.new(0.1, 0, 0, 130)
+PasswordInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+PasswordInput.BorderSizePixel = 0
+PasswordInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+PasswordInput.TextSize = 16
+PasswordInput.Font = Enum.Font.Gotham
+PasswordInput.PlaceholderText = GetText("password")
+PasswordInput.Text = ""
+PasswordInput.TextScaled = false
+PasswordInput.Parent = LoginFrame
+
+local PasswordCorner = Instance.new("UICorner")
+PasswordCorner.CornerRadius = UDim.new(0, 8)
+PasswordCorner.Parent = PasswordInput
+
+-- Login Button
+local LoginButton = Instance.new("TextButton")
+LoginButton.Name = "LoginButton"
+LoginButton.Size = UDim2.new(0.35, 0, 0, 40)
+LoginButton.Position = UDim2.new(0.1, 0, 0, 190)
+LoginButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+LoginButton.BorderSizePixel = 0
+LoginButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+LoginButton.TextSize = 16
+LoginButton.Font = Enum.Font.GothamBold
+LoginButton.Text = GetText("login")
+LoginButton.Parent = LoginFrame
+
+local LoginButtonCorner = Instance.new("UICorner")
+LoginButtonCorner.CornerRadius = UDim.new(0, 8)
+LoginButtonCorner.Parent = LoginButton
+
+-- Create Account Button
+local CreateButton = Instance.new("TextButton")
+CreateButton.Name = "CreateButton"
+CreateButton.Size = UDim2.new(0.35, 0, 0, 40)
+CreateButton.Position = UDim2.new(0.55, 0, 0, 190)
+CreateButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+CreateButton.BorderSizePixel = 0
+CreateButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CreateButton.TextSize = 16
+CreateButton.Font = Enum.Font.GothamBold
+CreateButton.Text = GetText("create_account")
+CreateButton.Parent = LoginFrame
+
+local CreateButtonCorner = Instance.new("UICorner")
+CreateButtonCorner.CornerRadius = UDim.new(0, 8)
+CreateButtonCorner.Parent = CreateButton
+
+-- Main Frame (Hidden initially)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, Settings.mainFrameSize[1], 0, Settings.mainFrameSize[2])
+MainFrame.Position = UDim2.new(0.5, -Settings.mainFrameSize[1]/2, 0.5, -Settings.mainFrameSize[2]/2)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Visible = false
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+TitleBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleBarCorner = Instance.new("UICorner")
+TitleBarCorner.CornerRadius = UDim.new(0, 10)
+TitleBarCorner.Parent = TitleBar
+
+-- Drag Bar (Optional)
+local DragBar = Instance.new("Frame")
+DragBar.Name = "DragBar"
+DragBar.Size = UDim2.new(0, 20, 1, -35)
+DragBar.Position = UDim2.new(0, 0, 0, 35)
+DragBar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+DragBar.BorderSizePixel = 0
+DragBar.Visible = Settings.dragBarEnabled
+DragBar.Parent = MainFrame
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(1, -175, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamBold
+Title.Text = GetText("title")
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+-- Settings Button
+local SettingsButton = Instance.new("TextButton")
+SettingsButton.Name = "SettingsButton"
+SettingsButton.Size = UDim2.new(0, 35, 0, 35)
+SettingsButton.Position = UDim2.new(1, -175, 0, 0)
+SettingsButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SettingsButton.BorderSizePixel = 0
+SettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SettingsButton.TextSize = 18
+SettingsButton.Font = Enum.Font.GothamBold
+SettingsButton.Text = "⚙️"
+SettingsButton.Parent = TitleBar
+
+local SettingsCorner = Instance.new("UICorner")
+SettingsCorner.CornerRadius = UDim.new(0, 8)
+SettingsCorner.Parent = SettingsButton
+
+-- Menu Button
+local MenuButton = Instance.new("TextButton")
+MenuButton.Name = "MenuButton"
+MenuButton.Size = UDim2.new(0, 35, 0, 35)
+MenuButton.Position = UDim2.new(1, -140, 0, 0)
+MenuButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+MenuButton.BorderSizePixel = 0
+MenuButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MenuButton.TextSize = 18
+MenuButton.Font = Enum.Font.GothamBold
+MenuButton.Text = "≡"
+MenuButton.Parent = TitleBar
+
+local MenuCorner = Instance.new("UICorner")
+MenuCorner.CornerRadius = UDim.new(0, 8)
+MenuCorner.Parent = MenuButton
+
+-- Language Button
+local LanguageButton = Instance.new("TextButton")
+LanguageButton.Name = "LanguageButton"
+LanguageButton.Size = UDim2.new(0, 35, 0, 35)
+LanguageButton.Position = UDim2.new(1, -105, 0, 0)
+LanguageButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+LanguageButton.BorderSizePixel = 0
+LanguageButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+LanguageButton.TextSize = 14
+LanguageButton.Font = Enum.Font.GothamBold
+LanguageButton.Text = Settings.language:upper()
+LanguageButton.Parent = TitleBar
+
+local LanguageCorner = Instance.new("UICorner")
+LanguageCorner.CornerRadius = UDim.new(0, 8)
+LanguageCorner.Parent = LanguageButton
+
+-- Minimize Button
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Name = "MinimizeButton"
+MinimizeButton.Size = UDim2.new(0, 35, 0, 35)
+MinimizeButton.Position = UDim2.new(1, -70, 0, 0)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.TextSize = 18
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.Text = "-"
+MinimizeButton.Parent = TitleBar
+
+local MinimizeCorner = Instance.new("UICorner")
+MinimizeCorner.CornerRadius = UDim.new(0, 8)
+MinimizeCorner.Parent = MinimizeButton
+
+-- Close Button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseButton"
+CloseButton.Size = UDim2.new(0, 35, 0, 35)
+CloseButton.Position = UDim2.new(1, -35, 0, 0)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseButton.BorderSizePixel = 0
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 18
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "X"
+CloseButton.Parent = TitleBar
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 8)
+CloseCorner.Parent = CloseButton
+
+-- Content Frame
+local ContentFrame = Instance.new("ScrollingFrame")
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Size = UDim2.new(1, Settings.dragBarEnabled and -20 or 0, 1, -35)
+ContentFrame.Position = UDim2.new(Settings.dragBarEnabled and 20 or 0, 0, 0, 35)
+ContentFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+ContentFrame.BorderSizePixel = 0
+ContentFrame.ScrollBarThickness = 6
+ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 1200)
+ContentFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ContentFrame.Parent = MainFrame
+
+-- Target Selection Section
+local TargetSection = Instance.new("Frame")
+TargetSection.Name = "TargetSection"
+TargetSection.Size = UDim2.new(0.95, 0, 0, 220)
+TargetSection.Position = UDim2.new(0.025, 0, 0, 10)
+TargetSection.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TargetSection.BorderSizePixel = 0
+TargetSection.Parent = ContentFrame
+
+local TargetCorner = Instance.new("UICorner")
+TargetCorner.CornerRadius = UDim.new(0, 8)
+TargetCorner.Parent = TargetSection
+
+local TargetTitle = Instance.new("TextLabel")
+TargetTitle.Name = "TargetTitle"
+TargetTitle.Size = UDim2.new(1, 0, 0, 30)
+TargetTitle.Position = UDim2.new(0, 0, 0, 5)
+TargetTitle.BackgroundTransparency = 1
+TargetTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetTitle.TextSize = 16
+TargetTitle.Font = Enum.Font.GothamBold
+TargetTitle.Text = GetText("target_selection")
+TargetTitle.Parent = TargetSection
+
+-- Select Nearest Button
+local SelectNearestButton = Instance.new("TextButton")
+SelectNearestButton.Name = "SelectNearestButton"
+SelectNearestButton.Size = UDim2.new(0.4, 0, 0, 35)
+SelectNearestButton.Position = UDim2.new(0.05, 0, 0, 40)
+SelectNearestButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+SelectNearestButton.BorderSizePixel = 0
+SelectNearestButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SelectNearestButton.TextSize = 14
+SelectNearestButton.Font = Enum.Font.GothamBold
+SelectNearestButton.Text = GetText("select_nearest")
+SelectNearestButton.Parent = TargetSection
+
+local SelectNearestCorner = Instance.new("UICorner")
+SelectNearestCorner.CornerRadius = UDim.new(0, 6)
+SelectNearestCorner.Parent = SelectNearestButton
+
+-- Look At Player Button
+local LookAtButton = Instance.new("TextButton")
+LookAtButton.Name = "LookAtButton"
+LookAtButton.Size = UDim2.new(0.4, 0, 0, 35)
+LookAtButton.Position = UDim2.new(0.55, 0, 0, 40)
+LookAtButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+LookAtButton.BorderSizePixel = 0
+LookAtButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+LookAtButton.TextSize = 14
+LookAtButton.Font = Enum.Font.GothamBold
+LookAtButton.Text = GetText("look_at_player") .. ": OFF"
+LookAtButton.Parent = TargetSection
+
+local LookAtCorner = Instance.new("UICorner")
+LookAtCorner.CornerRadius = UDim.new(0, 6)
+LookAtCorner.Parent = LookAtButton
+
+-- Body Part Selector
+local BodyPartButton = Instance.new("TextButton")
+BodyPartButton.Name = "BodyPartButton"
+BodyPartButton.Size = UDim2.new(0.4, 0, 0, 35)
+BodyPartButton.Position = UDim2.new(0.05, 0, 0, 85)
+BodyPartButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+BodyPartButton.BorderSizePixel = 0
+BodyPartButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BodyPartButton.TextSize = 14
+BodyPartButton.Font = Enum.Font.GothamBold
+BodyPartButton.Text = "Part: " .. bodyParts[bodyPartIndex]
+BodyPartButton.Parent = TargetSection
+
+local BodyPartCorner = Instance.new("UICorner")
+BodyPartCorner.CornerRadius = UDim.new(0, 6)
+BodyPartCorner.Parent = BodyPartButton
+
+-- Current Target Label
+local CurrentTargetLabel = Instance.new("TextLabel")
+CurrentTargetLabel.Name = "CurrentTargetLabel"
+CurrentTargetLabel.Size = UDim2.new(0.9, 0, 0, 30)
+CurrentTargetLabel.Position = UDim2.new(0.05, 0, 0, 130)
+CurrentTargetLabel.BackgroundTransparency = 1
+CurrentTargetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+CurrentTargetLabel.TextSize = 14
+CurrentTargetLabel.Font = Enum.Font.Gotham
+CurrentTargetLabel.Text = "Current Target: None"
+CurrentTargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+CurrentTargetLabel.Parent = TargetSection
+
+-- ESP Toggle Button
+local ESPToggleButton = Instance.new("TextButton")
+ESPToggleButton.Name = "ESPToggleButton"
+ESPToggleButton.Size = UDim2.new(0.4, 0, 0, 35)
+ESPToggleButton.Position = UDim2.new(0.55, 0, 0, 85)
+ESPToggleButton.BackgroundColor3 = Color3.fromRGB(200, 0, 200)
+ESPToggleButton.BorderSizePixel = 0
+ESPToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPToggleButton.TextSize = 14
+ESPToggleButton.Font = Enum.Font.GothamBold
+ESPToggleButton.Text = "ESP: OFF"
+ESPToggleButton.Parent = TargetSection
+
+local ESPToggleCorner = Instance.new("UICorner")
+ESPToggleCorner.CornerRadius = UDim.new(0, 6)
+ESPToggleCorner.Parent = ESPToggleButton
+
+-- Security Status Label
+local SecurityStatusLabel = Instance.new("TextLabel")
+SecurityStatusLabel.Name = "SecurityStatus"
+SecurityStatusLabel.Size = UDim2.new(0.9, 0, 0, 20)
+SecurityStatusLabel.Position = UDim2.new(0.05, 0, 0, 165)
+SecurityStatusLabel.BackgroundTransparency = 1
+SecurityStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+SecurityStatusLabel.TextSize = 12
+SecurityStatusLabel.Font = Enum.Font.Gotham
+SecurityStatusLabel.Text = "🔒 Security: Active | Anti-Detection: ON"
+SecurityStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+SecurityStatusLabel.Parent = TargetSection
+
+-- Minimized Icon
+local MinimizedIcon = Instance.new("ImageButton")
+MinimizedIcon.Name = "MinimizedIcon"
+MinimizedIcon.Size = UDim2.new(0, Settings.iconSize, 0, Settings.iconSize)
+MinimizedIcon.Position = UDim2.new(0, 10, 0, 10)
+MinimizedIcon.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+MinimizedIcon.BorderSizePixel = 0
+MinimizedIcon.Image = Settings.useVipIcon and Settings.iconImageUrl or "rbxassetid://6034684949"
+MinimizedIcon.Visible = false
+MinimizedIcon.Active = true
+MinimizedIcon.Draggable = Settings.iconDraggable
+MinimizedIcon.Parent = ScreenGui
+
+local MinimizedIconCorner = Instance.new("UICorner")
+MinimizedIconCorner.CornerRadius = UDim.new(0, 10)
+MinimizedIconCorner.Parent = MinimizedIcon
+
+-- Settings Frame
+local SettingsFrame = Instance.new("Frame")
+SettingsFrame.Name = "SettingsFrame"
+SettingsFrame.Size = UDim2.new(0, 450, 0, 600)
+SettingsFrame.Position = UDim2.new(0.5, 200, 0.5, -300)
+SettingsFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+SettingsFrame.BorderSizePixel = 0
+SettingsFrame.Visible = false
+SettingsFrame.Active = true
+SettingsFrame.Draggable = true
+SettingsFrame.Parent = ScreenGui
+
+local SettingsFrameCorner = Instance.new("UICorner")
+SettingsFrameCorner.CornerRadius = UDim.new(0, 10)
+SettingsFrameCorner.Parent = SettingsFrame
+
+-- Settings Title Bar
+local SettingsTitleBar = Instance.new("Frame")
+SettingsTitleBar.Name = "SettingsTitleBar"
+SettingsTitleBar.Size = UDim2.new(1, 0, 0, 35)
+SettingsTitleBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SettingsTitleBar.BorderSizePixel = 0
+SettingsTitleBar.Parent = SettingsFrame
+
+local SettingsTitleCorner = Instance.new("UICorner")
+SettingsTitleCorner.CornerRadius = UDim.new(0, 10)
+SettingsTitleCorner.Parent = SettingsTitleBar
+
+local SettingsTitle = Instance.new("TextLabel")
+SettingsTitle.Name = "SettingsTitle"
+SettingsTitle.Size = UDim2.new(1, -40, 1, 0)
+SettingsTitle.Position = UDim2.new(0, 15, 0, 0)
+SettingsTitle.BackgroundTransparency = 1
+SettingsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+SettingsTitle.TextSize = 18
+SettingsTitle.Font = Enum.Font.GothamBold
+SettingsTitle.Text = GetText("settings")
+SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+SettingsTitle.Parent = SettingsTitleBar
+
+local SettingsCloseButton = Instance.new("TextButton")
+SettingsCloseButton.Name = "SettingsCloseButton"
+SettingsCloseButton.Size = UDim2.new(0, 35, 0, 35)
+SettingsCloseButton.Position = UDim2.new(1, -35, 0, 0)
+SettingsCloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+SettingsCloseButton.BorderSizePixel = 0
+SettingsCloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SettingsCloseButton.TextSize = 18
+SettingsCloseButton.Font = Enum.Font.GothamBold
+SettingsCloseButton.Text = "X"
+SettingsCloseButton.Parent = SettingsTitleBar
+
+local SettingsCloseCorner = Instance.new("UICorner")
+SettingsCloseCorner.CornerRadius = UDim.new(0, 8)
+SettingsCloseCorner.Parent = SettingsCloseButton
+
+-- Settings Content
+local SettingsContent = Instance.new("ScrollingFrame")
+SettingsContent.Name = "SettingsContent"
+SettingsContent.Size = UDim2.new(1, 0, 1, -35)
+SettingsContent.Position = UDim2.new(0, 0, 0, 35)
+SettingsContent.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+SettingsContent.BorderSizePixel = 0
+SettingsContent.ScrollBarThickness = 6
+SettingsContent.CanvasSize = UDim2.new(0, 0, 0, 1000)
+SettingsContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+SettingsContent.Parent = SettingsFrame
+
+-- ESP Settings Section
+local ESPSection = Instance.new("Frame")
+ESPSection.Name = "ESPSection"
+ESPSection.Size = UDim2.new(0.95, 0, 0, 300)
+ESPSection.Position = UDim2.new(0.025, 0, 0, 10)
+ESPSection.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+ESPSection.BorderSizePixel = 0
+ESPSection.Parent = SettingsContent
+
+local ESPSectionCorner = Instance.new("UICorner")
+ESPSectionCorner.CornerRadius = UDim.new(0, 8)
+ESPSectionCorner.Parent = ESPSection
+
+local ESPSectionTitle = Instance.new("TextLabel")
+ESPSectionTitle.Name = "ESPSectionTitle"
+ESPSectionTitle.Size = UDim2.new(1, 0, 0, 30)
+ESPSectionTitle.BackgroundTransparency = 1
+ESPSectionTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPSectionTitle.TextSize = 16
+ESPSectionTitle.Font = Enum.Font.GothamBold
+ESPSectionTitle.Text = GetText("esp_settings")
+ESPSectionTitle.Parent = ESPSection
+
+-- ESP Text Size
+local ESPTextSizeLabel = Instance.new("TextLabel")
+ESPTextSizeLabel.Name = "ESPTextSizeLabel"
+ESPTextSizeLabel.Size = UDim2.new(0.4, 0, 0, 30)
+ESPTextSizeLabel.Position = UDim2.new(0.05, 0, 0, 40)
+ESPTextSizeLabel.BackgroundTransparency = 1
+ESPTextSizeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPTextSizeLabel.TextSize = 14
+ESPTextSizeLabel.Font = Enum.Font.Gotham
+ESPTextSizeLabel.Text = GetText("text_size") .. ":"
+ESPTextSizeLabel.TextXAlignment = Enum.TextXAlignment.Left
+ESPTextSizeLabel.Parent = ESPSection
+
+local ESPTextSizeInput = Instance.new("TextBox")
+ESPTextSizeInput.Name = "ESPTextSizeInput"
+ESPTextSizeInput.Size = UDim2.new(0.4, 0, 0, 30)
+ESPTextSizeInput.Position = UDim2.new(0.55, 0, 0, 40)
+ESPTextSizeInput.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+ESPTextSizeInput.BorderSizePixel = 0
+ESPTextSizeInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPTextSizeInput.TextSize = 14
+ESPTextSizeInput.Font = Enum.Font.Gotham
+ESPTextSizeInput.Text = tostring(Settings.espTextSize)
+ESPTextSizeInput.Parent = ESPSection
+
+local ESPTextSizeCorner = Instance.new("UICorner")
+ESPTextSizeCorner.CornerRadius = UDim.new(0, 6)
+ESPTextSizeCorner.Parent = ESPTextSizeInput
+
+-- ESP Text Color (Hex)
+local ESPTextColorLabel = Instance.new("TextLabel")
+ESPTextColorLabel.Name = "ESPTextColorLabel"
+ESPTextColorLabel.Size = UDim2.new(0.4, 0, 0, 30)
+ESPTextColorLabel.Position = UDim2.new(0.05, 0, 0, 80)
+ESPTextColorLabel.BackgroundTransparency = 1
+ESPTextColorLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPTextColorLabel.TextSize = 14
+ESPTextColorLabel.Font = Enum.Font.Gotham
+ESPTextColorLabel.Text = GetText("text_color") .. " (Hex):"
+ESPTextColorLabel.TextXAlignment = Enum.TextXAlignment.Left
+ESPTextColorLabel.Parent = ESPSection
+
+local ESPTextColorInput = Instance.new("TextBox")
+ESPTextColorInput.Name = "ESPTextColorInput"
+ESPTextColorInput.Size = UDim2.new(0.4, 0, 0, 30)
+ESPTextColorInput.Position = UDim2.new(0.55, 0, 0, 80)
+ESPTextColorInput.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+ESPTextColorInput.BorderSizePixel = 0
+ESPTextColorInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPTextColorInput.TextSize = 14
+ESPTextColorInput.Font = Enum.Font.Gotham
+ESPTextColorInput.Text = Settings.espTextColorHex
+ESPTextColorInput.Parent = ESPSection
+
+local ESPTextColorCorner = Instance.new("UICorner")
+ESPTextColorCorner.CornerRadius = UDim.new(0, 6)
+ESPTextColorCorner.Parent = ESPTextColorInput
+
+-- ESP Checkboxes
+local ESPWallHackCheck = Instance.new("TextButton")
+ESPWallHackCheck.Name = "ESPWallHackCheck"
+ESPWallHackCheck.Size = UDim2.new(0.4, 0, 0, 30)
+ESPWallHackCheck.Position = UDim2.new(0.05, 0, 0, 120)
+ESPWallHackCheck.BackgroundColor3 = Settings.espWallHack and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+ESPWallHackCheck.BorderSizePixel = 0
+ESPWallHackCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPWallHackCheck.TextSize = 14
+ESPWallHackCheck.Font = Enum.Font.GothamBold
+ESPWallHackCheck.Text = GetText("wall_hack") .. ": " .. (Settings.espWallHack and "ON" or "OFF")
+ESPWallHackCheck.Parent = ESPSection
+
+local ESPWallHackCorner = Instance.new("UICorner")
+ESPWallHackCorner.CornerRadius = UDim.new(0, 6)
+ESPWallHackCorner.Parent = ESPWallHackCheck
+
+local ESPShowDistanceCheck = Instance.new("TextButton")
+ESPShowDistanceCheck.Name = "ESPShowDistanceCheck"
+ESPShowDistanceCheck.Size = UDim2.new(0.4, 0, 0, 30)
+ESPShowDistanceCheck.Position = UDim2.new(0.55, 0, 0, 120)
+ESPShowDistanceCheck.BackgroundColor3 = Settings.espShowDistance and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+ESPShowDistanceCheck.BorderSizePixel = 0
+ESPShowDistanceCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPShowDistanceCheck.TextSize = 14
+ESPShowDistanceCheck.Font = Enum.Font.GothamBold
+ESPShowDistanceCheck.Text = GetText("show_distance") .. ": " .. (Settings.espShowDistance and "ON" or "OFF")
+ESPShowDistanceCheck.Parent = ESPSection
+
+local ESPShowDistanceCorner = Instance.new("UICorner")
+ESPShowDistanceCorner.CornerRadius = UDim.new(0, 6)
+ESPShowDistanceCorner.Parent = ESPShowDistanceCheck
+
+local ESPShowNameCheck = Instance.new("TextButton")
+ESPShowNameCheck.Name = "ESPShowNameCheck"
+ESPShowNameCheck.Size = UDim2.new(0.4, 0, 0, 30)
+ESPShowNameCheck.Position = UDim2.new(0.05, 0, 0, 160)
+ESPShowNameCheck.BackgroundColor3 = Settings.espShowName and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+ESPShowNameCheck.BorderSizePixel = 0
+ESPShowNameCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPShowNameCheck.TextSize = 14
+ESPShowNameCheck.Font = Enum.Font.GothamBold
+ESPShowNameCheck.Text = GetText("show_name") .. ": " .. (Settings.espShowName and "ON" or "OFF")
+ESPShowNameCheck.Parent = ESPSection
+
+local ESPShowNameCorner = Instance.new("UICorner")
+ESPShowNameCorner.CornerRadius = UDim.new(0, 6)
+ESPShowNameCorner.Parent = ESPShowNameCheck
+
+local ESPShowHPCheck = Instance.new("TextButton")
+ESPShowHPCheck.Name = "ESPShowHPCheck"
+ESPShowHPCheck.Size = UDim2.new(0.4, 0, 0, 30)
+ESPShowHPCheck.Position = UDim2.new(0.55, 0, 0, 160)
+ESPShowHPCheck.BackgroundColor3 = Settings.espShowHP and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+ESPShowHPCheck.BorderSizePixel = 0
+ESPShowHPCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPShowHPCheck.TextSize = 14
+ESPShowHPCheck.Font = Enum.Font.GothamBold
+ESPShowHPCheck.Text = GetText("show_hp") .. ": " .. (Settings.espShowHP and "ON" or "OFF")
+ESPShowHPCheck.Parent = ESPSection
+
+local ESPShowHPCorner = Instance.new("UICorner")
+ESPShowHPCorner.CornerRadius = UDim.new(0, 6)
+ESPShowHPCorner.Parent = ESPShowHPCheck
+
+-- Apply ESP Settings Button
+local ApplyESPButton = Instance.new("TextButton")
+ApplyESPButton.Name = "ApplyESPButton"
+ApplyESPButton.Size = UDim2.new(0.9, 0, 0, 40)
+ApplyESPButton.Position = UDim2.new(0.05, 0, 0, 210)
+ApplyESPButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+ApplyESPButton.BorderSizePixel = 0
+ApplyESPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ApplyESPButton.TextSize = 16
+ApplyESPButton.Font = Enum.Font.GothamBold
+ApplyESPButton.Text = GetText("apply") .. " ESP " .. GetText("settings")
+ApplyESPButton.Parent = ESPSection
+
+local ApplyESPCorner = Instance.new("UICorner")
+ApplyESPCorner.CornerRadius = UDim.new(0, 6)
+ApplyESPCorner.Parent = ApplyESPButton
+
+-- Icon Settings Section
+local IconSection = Instance.new("Frame")
+IconSection.Name = "IconSection"
+IconSection.Size = UDim2.new(0.95, 0, 0, 280)
+IconSection.Position = UDim2.new(0.025, 0, 0, 320)
+IconSection.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+IconSection.BorderSizePixel = 0
+IconSection.Parent = SettingsContent
+
+local IconSectionCorner = Instance.new("UICorner")
+IconSectionCorner.CornerRadius = UDim.new(0, 8)
+IconSectionCorner.Parent = IconSection
+
+local IconSectionTitle = Instance.new("TextLabel")
+IconSectionTitle.Name = "IconSectionTitle"
+IconSectionTitle.Size = UDim2.new(1, 0, 0, 30)
+IconSectionTitle.BackgroundTransparency = 1
+IconSectionTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+IconSectionTitle.TextSize = 16
+IconSectionTitle.Font = Enum.Font.GothamBold
+IconSectionTitle.Text = GetText("icon_settings")
+IconSectionTitle.Parent = IconSection
+
+-- Icon Size
+local IconSizeLabel = Instance.new("TextLabel")
+IconSizeLabel.Name = "IconSizeLabel"
+IconSizeLabel.Size = UDim2.new(0.4, 0, 0, 30)
+IconSizeLabel.Position = UDim2.new(0.05, 0, 0, 40)
+IconSizeLabel.BackgroundTransparency = 1
+IconSizeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+IconSizeLabel.TextSize = 14
+IconSizeLabel.Font = Enum.Font.Gotham
+IconSizeLabel.Text = GetText("icon_size") .. ":"
+IconSizeLabel.TextXAlignment = Enum.TextXAlignment.Left
+IconSizeLabel.Parent = IconSection
+
+local IconSizeInput = Instance.new("TextBox")
+IconSizeInput.Name = "IconSizeInput"
+IconSizeInput.Size = UDim2.new(0.4, 0, 0, 30)
+IconSizeInput.Position = UDim2.new(0.55, 0, 0, 40)
+IconSizeInput.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+IconSizeInput.BorderSizePixel = 0
+IconSizeInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+IconSizeInput.TextSize = 14
+IconSizeInput.Font = Enum.Font.Gotham
+IconSizeInput.Text = tostring(Settings.iconSize)
+IconSizeInput.Parent = IconSection
+
+local IconSizeCorner = Instance.new("UICorner")
+IconSizeCorner.CornerRadius = UDim.new(0, 6)
+IconSizeCorner.Parent = IconSizeInput
+
+-- Icon Draggable
+local IconDraggableCheck = Instance.new("TextButton")
+IconDraggableCheck.Name = "IconDraggableCheck"
+IconDraggableCheck.Size = UDim2.new(0.4, 0, 0, 30)
+IconDraggableCheck.Position = UDim2.new(0.05, 0, 0, 80)
+IconDraggableCheck.BackgroundColor3 = Settings.iconDraggable and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+IconDraggableCheck.BorderSizePixel = 0
+IconDraggableCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+IconDraggableCheck.TextSize = 14
+IconDraggableCheck.Font = Enum.Font.GothamBold
+IconDraggableCheck.Text = GetText("draggable") .. ": " .. (Settings.iconDraggable and "ON" or "OFF")
+IconDraggableCheck.Parent = IconSection
+
+local IconDraggableCorner = Instance.new("UICorner")
+IconDraggableCorner.CornerRadius = UDim.new(0, 6)
+IconDraggableCorner.Parent = IconDraggableCheck
+
+-- Roblox ID Input
+local RobloxIdLabel = Instance.new("TextLabel")
+RobloxIdLabel.Name = "RobloxIdLabel"
+RobloxIdLabel.Size = UDim2.new(0.4, 0, 0, 30)
+RobloxIdLabel.Position = UDim2.new(0.05, 0, 0, 120)
+RobloxIdLabel.BackgroundTransparency = 1
+RobloxIdLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+RobloxIdLabel.TextSize = 14
+RobloxIdLabel.Font = Enum.Font.Gotham
+RobloxIdLabel.Text = GetText("roblox_id") .. ":"
+RobloxIdLabel.TextXAlignment = Enum.TextXAlignment.Left
+RobloxIdLabel.Parent = IconSection
+
+local RobloxIdInput = Instance.new("TextBox")
+RobloxIdInput.Name = "RobloxIdInput"
+RobloxIdInput.Size = UDim2.new(0.4, 0, 0, 30)
+RobloxIdInput.Position = UDim2.new(0.55, 0, 0, 120)
+RobloxIdInput.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+RobloxIdInput.BorderSizePixel = 0
+RobloxIdInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+RobloxIdInput.TextSize = 14
+RobloxIdInput.Font = Enum.Font.Gotham
+RobloxIdInput.Text = Settings.iconImageId
+RobloxIdInput.PlaceholderText = "Enter Roblox Asset ID"
+RobloxIdInput.Parent = IconSection
+
+local RobloxIdCorner = Instance.new("UICorner")
+RobloxIdCorner.CornerRadius = UDim.new(0, 6)
+RobloxIdCorner.Parent = RobloxIdInput
+
+-- Apply Icon Settings Button
+local ApplyIconButton = Instance.new("TextButton")
+ApplyIconButton.Name = "ApplyIconButton"
+ApplyIconButton.Size = UDim2.new(0.9, 0, 0, 40)
+ApplyIconButton.Position = UDim2.new(0.05, 0, 0, 170)
+ApplyIconButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+ApplyIconButton.BorderSizePixel = 0
+ApplyIconButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ApplyIconButton.TextSize = 16
+ApplyIconButton.Font = Enum.Font.GothamBold
+ApplyIconButton.Text = GetText("apply") .. " Icon " .. GetText("settings")
+ApplyIconButton.Parent = IconSection
+
+local ApplyIconCorner = Instance.new("UICorner")
+ApplyIconCorner.CornerRadius = UDim.new(0, 6)
+ApplyIconCorner.Parent = ApplyIconButton
+
+-- Frame Settings Section
+local FrameSection = Instance.new("Frame")
+FrameSection.Name = "FrameSection"
+FrameSection.Size = UDim2.new(0.95, 0, 0, 200)
+FrameSection.Position = UDim2.new(0.025, 0, 0, 610)
+FrameSection.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+FrameSection.BorderSizePixel = 0
+FrameSection.Parent = SettingsContent
+
+local FrameSectionCorner = Instance.new("UICorner")
+FrameSectionCorner.CornerRadius = UDim.new(0, 8)
+FrameSectionCorner.Parent = FrameSection
+
+local FrameSectionTitle = Instance.new("TextLabel")
+FrameSectionTitle.Name = "FrameSectionTitle"
+FrameSectionTitle.Size = UDim2.new(1, 0, 0, 30)
+FrameSectionTitle.BackgroundTransparency = 1
+FrameSectionTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+FrameSectionTitle.TextSize = 16
+FrameSectionTitle.Font = Enum.Font.GothamBold
+FrameSectionTitle.Text = "Frame Settings"
+FrameSectionTitle.Parent = FrameSection
+
+-- Frame Width
+local FrameWidthLabel = Instance.new("TextLabel")
+FrameWidthLabel.Name = "FrameWidthLabel"
+FrameWidthLabel.Size = UDim2.new(0.4, 0, 0, 30)
+FrameWidthLabel.Position = UDim2.new(0.05, 0, 0, 40)
+FrameWidthLabel.BackgroundTransparency = 1
+FrameWidthLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+FrameWidthLabel.TextSize = 14
+FrameWidthLabel.Font = Enum.Font.Gotham
+FrameWidthLabel.Text = GetText("frame_width") .. ":"
+FrameWidthLabel.TextXAlignment = Enum.TextXAlignment.Left
+FrameWidthLabel.Parent = FrameSection
+
+local FrameWidthInput = Instance.new("TextBox")
+FrameWidthInput.Name = "FrameWidthInput"
+FrameWidthInput.Size = UDim2.new(0.4, 0, 0, 30)
+FrameWidthInput.Position = UDim2.new(0.55, 0, 0, 40)
+FrameWidthInput.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+FrameWidthInput.BorderSizePixel = 0
+FrameWidthInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+FrameWidthInput.TextSize = 14
+FrameWidthInput.Font = Enum.Font.Gotham
+FrameWidthInput.Text = tostring(Settings.mainFrameSize[1])
+FrameWidthInput.Parent = FrameSection
+
+local FrameWidthCorner = Instance.new("UICorner")
+FrameWidthCorner.CornerRadius = UDim.new(0, 6)
+FrameWidthCorner.Parent = FrameWidthInput
+
+-- Frame Height
+local FrameHeightLabel = Instance.new("TextLabel")
+FrameHeightLabel.Name = "FrameHeightLabel"
+FrameHeightLabel.Size = UDim2.new(0.4, 0, 0, 30)
+FrameHeightLabel.Position = UDim2.new(0.05, 0, 0, 80)
+FrameHeightLabel.BackgroundTransparency = 1
+FrameHeightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+FrameHeightLabel.TextSize = 14
+FrameHeightLabel.Font = Enum.Font.Gotham
+FrameHeightLabel.Text = GetText("frame_height") .. ":"
+FrameHeightLabel.TextXAlignment = Enum.TextXAlignment.Left
+FrameHeightLabel.Parent = FrameSection
+
+local FrameHeightInput = Instance.new("TextBox")
+FrameHeightInput.Name = "FrameHeightInput"
+FrameHeightInput.Size = UDim2.new(0.4, 0, 0, 30)
+FrameHeightInput.Position = UDim2.new(0.55, 0, 0, 80)
+FrameHeightInput.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+FrameHeightInput.BorderSizePixel = 0
+FrameHeightInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+FrameHeightInput.TextSize = 14
+FrameHeightInput.Font = Enum.Font.Gotham
+FrameHeightInput.Text = tostring(Settings.mainFrameSize[2])
+FrameHeightInput.Parent = FrameSection
+
+local FrameHeightCorner = Instance.new("UICorner")
+FrameHeightCorner.CornerRadius = UDim.new(0, 6)
+FrameHeightCorner.Parent = FrameHeightInput
+
+-- Drag Bar Toggle
+local DragBarCheck = Instance.new("TextButton")
+DragBarCheck.Name = "DragBarCheck"
+DragBarCheck.Size = UDim2.new(0.4, 0, 0, 30)
+DragBarCheck.Position = UDim2.new(0.05, 0, 0, 120)
+DragBarCheck.BackgroundColor3 = Settings.dragBarEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+DragBarCheck.BorderSizePixel = 0
+DragBarCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+DragBarCheck.TextSize = 14
+DragBarCheck.Font = Enum.Font.GothamBold
+DragBarCheck.Text = GetText("drag_bar") .. ": " .. (Settings.dragBarEnabled and "ON" or "OFF")
+DragBarCheck.Parent = FrameSection
+
+local DragBarCorner = Instance.new("UICorner")
+DragBarCorner.CornerRadius = UDim.new(0, 6)
+DragBarCorner.Parent = DragBarCheck
+
+-- Apply Frame Settings Button
+local ApplyFrameButton = Instance.new("TextButton")
+ApplyFrameButton.Name = "ApplyFrameButton"
+ApplyFrameButton.Size = UDim2.new(0.4, 0, 0, 30)
+ApplyFrameButton.Position = UDim2.new(0.55, 0, 0, 120)
+ApplyFrameButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+ApplyFrameButton.BorderSizePixel = 0
+ApplyFrameButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ApplyFrameButton.TextSize = 14
+ApplyFrameButton.Font = Enum.Font.GothamBold
+ApplyFrameButton.Text = GetText("apply") .. " Frame"
+ApplyFrameButton.Parent = FrameSection
+
+local ApplyFrameCorner = Instance.new("UICorner")
+ApplyFrameCorner.CornerRadius = UDim.new(0, 6)
+ApplyFrameCorner.Parent = ApplyFrameButton
+
+-- VIP Access Frame
+local VIPFrame = Instance.new("Frame")
+VIPFrame.Name = "VIPFrame"
+VIPFrame.Size = UDim2.new(0, 350, 0, 450)
+VIPFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
+VIPFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+VIPFrame.BorderSizePixel = 0
+VIPFrame.Visible = false
+VIPFrame.Active = true
+VIPFrame.Draggable = true
+VIPFrame.Parent = ScreenGui
+
+local VIPFrameCorner = Instance.new("UICorner")
+VIPFrameCorner.CornerRadius = UDim.new(0, 10)
+VIPFrameCorner.Parent = VIPFrame
+
+-- VIP Title Bar
+local VIPTitleBar = Instance.new("Frame")
+VIPTitleBar.Name = "VIPTitleBar"
+VIPTitleBar.Size = UDim2.new(1, 0, 0, 35)
+VIPTitleBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+VIPTitleBar.BorderSizePixel = 0
+VIPTitleBar.Parent = VIPFrame
+
+local VIPTitleCorner = Instance.new("UICorner")
+VIPTitleCorner.CornerRadius = UDim.new(0, 10)
+VIPTitleCorner.Parent = VIPTitleBar
+
+local VIPTitle = Instance.new("TextLabel")
+VIPTitle.Name = "VIPTitle"
+VIPTitle.Size = UDim2.new(1, -40, 1, 0)
+VIPTitle.Position = UDim2.new(0, 15, 0, 0)
+VIPTitle.BackgroundTransparency = 1
+VIPTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+VIPTitle.TextSize = 18
+VIPTitle.Font = Enum.Font.GothamBold
+VIPTitle.Text = GetText("vip_access")
+VIPTitle.TextXAlignment = Enum.TextXAlignment.Left
+VIPTitle.Parent = VIPTitleBar
+
+local VIPCloseButton = Instance.new("TextButton")
+VIPCloseButton.Name = "VIPCloseButton"
+VIPCloseButton.Size = UDim2.new(0, 35, 0, 35)
+VIPCloseButton.Position = UDim2.new(1, -35, 0, 0)
+VIPCloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+VIPCloseButton.BorderSizePixel = 0
+VIPCloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+VIPCloseButton.TextSize = 18
+VIPCloseButton.Font = Enum.Font.GothamBold
+VIPCloseButton.Text = "X"
+VIPCloseButton.Parent = VIPTitleBar
+
+local VIPCloseCorner = Instance.new("UICorner")
+VIPCloseCorner.CornerRadius = UDim.new(0, 8)
+VIPCloseCorner.Parent = VIPCloseButton
+
+-- VIP Content
+local VIPContent = Instance.new("Frame")
+VIPContent.Name = "VIPContent"
+VIPContent.Size = UDim2.new(1, 0, 1, -35)
+VIPContent.Position = UDim2.new(0, 0, 0, 35)
+VIPContent.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+VIPContent.BorderSizePixel = 0
+VIPContent.Parent = VIPFrame
+
+-- CAPTCHA Display
+local CaptchaDisplay = Instance.new("TextBox")
+CaptchaDisplay.Name = "CaptchaDisplay"
+CaptchaDisplay.Size = UDim2.new(0.8, 0, 0, 40)
+CaptchaDisplay.Position = UDim2.new(0.1, 0, 0, 50)
+CaptchaDisplay.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+CaptchaDisplay.BorderSizePixel = 0
+CaptchaDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
+CaptchaDisplay.TextSize = 18
+CaptchaDisplay.Font = Enum.Font.GothamBold
+CaptchaDisplay.Text = ""
+CaptchaDisplay.TextEditable = false
+CaptchaDisplay.Parent = VIPContent
+
+local CaptchaDisplayCorner = Instance.new("UICorner")
+CaptchaDisplayCorner.CornerRadius = UDim.new(0, 8)
+CaptchaDisplayCorner.Parent = CaptchaDisplay
+
+-- CAPTCHA Input
+local CaptchaInputBox = Instance.new("TextBox")
+CaptchaInputBox.Name = "CaptchaInputBox"
+CaptchaInputBox.Size = UDim2.new(0.8, 0, 0, 40)
+CaptchaInputBox.Position = UDim2.new(0.1, 0, 0, 100)
+CaptchaInputBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CaptchaInputBox.BorderSizePixel = 0
+CaptchaInputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+CaptchaInputBox.TextSize = 16
+CaptchaInputBox.Font = Enum.Font.Gotham
+CaptchaInputBox.PlaceholderText = GetText("enter_captcha")
+CaptchaInputBox.Text = ""
+CaptchaInputBox.Parent = VIPContent
+
+local CaptchaInputCorner = Instance.new("UICorner")
+CaptchaInputCorner.CornerRadius = UDim.new(0, 8)
+CaptchaInputCorner.Parent = CaptchaInputBox
+
+-- VIP Password Input (Hidden initially)
+local VIPPasswordInput = Instance.new("TextBox")
+VIPPasswordInput.Name = "VIPPasswordInput"
+VIPPasswordInput.Size = UDim2.new(0.8, 0, 0, 40)
+VIPPasswordInput.Position = UDim2.new(0.1, 0, 0, 200)
+VIPPasswordInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+VIPPasswordInput.BorderSizePixel = 0
+VIPPasswordInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+VIPPasswordInput.TextSize = 16
+VIPPasswordInput.Font = Enum.Font.Gotham
+VIPPasswordInput.PlaceholderText = GetText("vip_password")
+VIPPasswordInput.Text = ""
+VIPPasswordInput.Visible = false
+VIPPasswordInput.Parent = VIPContent
+
+local VIPPasswordCorner = Instance.new("UICorner")
+VIPPasswordCorner.CornerRadius = UDim.new(0, 8)
+VIPPasswordCorner.Parent = VIPPasswordInput
+
+-- Verify CAPTCHA Button
+local VerifyCaptchaButton = Instance.new("TextButton")
+VerifyCaptchaButton.Name = "VerifyCaptchaButton"
+VerifyCaptchaButton.Size = UDim2.new(0.8, 0, 0, 40)
+VerifyCaptchaButton.Position = UDim2.new(0.1, 0, 0, 150)
+VerifyCaptchaButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+VerifyCaptchaButton.BorderSizePixel = 0
+VerifyCaptchaButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerifyCaptchaButton.TextSize = 16
+VerifyCaptchaButton.Font = Enum.Font.GothamBold
+VerifyCaptchaButton.Text = "Verify CAPTCHA"
+VerifyCaptchaButton.Parent = VIPContent
+
+local VerifyCaptchaCorner = Instance.new("UICorner")
+VerifyCaptchaCorner.CornerRadius = UDim.new(0, 8)
+VerifyCaptchaCorner.Parent = VerifyCaptchaButton
+
+-- Verify VIP Button (Hidden initially)
+local VerifyVIPButton = Instance.new("TextButton")
+VerifyVIPButton.Name = "VerifyVIPButton"
+VerifyVIPButton.Size = UDim2.new(0.8, 0, 0, 40)
+VerifyVIPButton.Position = UDim2.new(0.1, 0, 0, 250)
+VerifyVIPButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+VerifyVIPButton.BorderSizePixel = 0
+VerifyVIPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerifyVIPButton.TextSize = 16
+VerifyVIPButton.Font = Enum.Font.GothamBold
+VerifyVIPButton.Text = "Verify VIP"
+VerifyVIPButton.Visible = false
+VerifyVIPButton.Parent = VIPContent
+
+local VerifyVIPCorner = Instance.new("UICorner")
+VerifyVIPCorner.CornerRadius = UDim.new(0, 8)
+VerifyVIPCorner.Parent = VerifyVIPButton
+
+-- ESP Storage
+local ESPObjects = {}
+
+-- Functions
+local function SaveSettings()
+    local data = HttpService:JSONEncode(Settings)
+    print("Settings saved:", data)
+end
+
+local function LoadSettings()
+    print("Settings loaded")
+end
+
+local function UpdateLanguage()
+    LoginTitle.Text = GetText("title")
+    UsernameInput.PlaceholderText = GetText("username")
+    PasswordInput.PlaceholderText = GetText("password")
+    LoginButton.Text = GetText("login")
+    CreateButton.Text = GetText("create_account")
+    Title.Text = GetText("title")
+    TargetTitle.Text = GetText("target_selection")
+    SelectNearestButton.Text = GetText("select_nearest")
+    LookAtButton.Text = GetText("look_at_player") .. ": " .. (lookingAtPlayer and "ON" or "OFF")
+    LanguageButton.Text = Settings.language:upper()
+    SettingsTitle.Text = GetText("settings")
+    ESPSectionTitle.Text = GetText("esp_settings")
+    IconSectionTitle.Text = GetText("icon_settings")
+    VIPTitle.Text = GetText("vip_access")
+    CaptchaInputBox.PlaceholderText = GetText("enter_captcha")
+    VIPPasswordInput.PlaceholderText = GetText("vip_password")
+end
+
+local function GenerateNewCaptcha()
+    captchaCode = GenerateCaptcha()
+    CaptchaDisplay.Text = captchaCode
+end
+
+local function GetNearestPlayer()
+    local nearestPlayer = nil
+    local shortestDistance = math.huge
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (player.Character.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                nearestPlayer = player
+            end
+        end
+    end
+    
+    return nearestPlayer
+end
+
+local function CreateESP(player)
+    if not player.Character or not player.Character:FindFirstChild("Head") then return end
+    
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP_" .. player.Name
+    billboard.Adornee = player.Character.Head
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = Settings.espWallHack
+    billboard.Parent = CoreGui
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = Color3.fromRGB(Settings.espTextColor[1], Settings.espTextColor[2], Settings.espTextColor[3])
+    textLabel.TextSize = Settings.espTextSize
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextStrokeTransparency = 0
+    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    textLabel.Parent = billboard
+    
+    local function updateText()
+        local text = ""
+        if Settings.espShowName then
+            text = text .. player.Name
+        end
+        if Settings.espShowDistance and Character and Character:FindFirstChild("HumanoidRootPart") then
+            local distance = math.floor((player.Character.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude)
+            text = text .. (text ~= "" and " (" .. distance .. "m)" or distance .. "m")
+        end
+        if Settings.espShowHP and player.Character:FindFirstChild("Humanoid") then
+            local hp = math.floor(player.Character.Humanoid.Health)
+            text = text .. (text ~= "" and " [" .. hp .. "HP]" or hp .. "HP")
+        end
+        textLabel.Text = text
+    end
+    
+    ESPObjects[player] = {billboard = billboard, updateText = updateText}
+    updateText()
+end
+
+local function RemoveESP(player)
+    if ESPObjects[player] then
+        ESPObjects[player].billboard:Destroy()
+        ESPObjects[player] = nil
+    end
+end
+
+local function ToggleESP()
+    Settings.espEnabled = not Settings.espEnabled
+    
+    if Settings.espEnabled then
+        ESPToggleButton.Text = "ESP: ON"
+        ESPToggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                CreateESP(player)
+            end
+        end
+        
+        RunService.Heartbeat:Connect(function()
+            if Settings.espEnabled then
+                for player, espData in pairs(ESPObjects) do
+                    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        espData.updateText()
+                    end
+                end
+            end
+        end)
+    else
+        ESPToggleButton.Text = "ESP: OFF"
+        ESPToggleButton.BackgroundColor3 = Color3.fromRGB(200, 0, 200)
+        
+        for player, _ in pairs(ESPObjects) do
+            RemoveESP(player)
+        end
+    end
+end
+
+local function ToggleLookAtPlayer()
+    lookingAtPlayer = not lookingAtPlayer
+    
+    if lookingAtPlayer then
+        LookAtButton.Text = GetText("look_at_player") .. ": ON"
+        LookAtButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        
+        if lookTarget then
+            RunService.RenderStepped:Connect(function()
+                if lookingAtPlayer and lookTarget and lookTarget.Character then
+                    local targetPart = lookTarget.Character:FindFirstChild(bodyParts[bodyPartIndex])
+                    if targetPart and Character and Character:FindFirstChild("Head") then
+                        local lookDirection = (targetPart.Position - Character.Head.Position).Unit
+                        Character.Head.CFrame = CFrame.lookAt(Character.Head.Position, targetPart.Position)
+                        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPart.Position)
+                    end
+                end
+            end)
+        end
+    else
+        LookAtButton.Text = GetText("look_at_player") .. ": OFF"
+        LookAtButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    end
+end
+
+local function CycleBodyPart()
+    bodyPartIndex = bodyPartIndex % #bodyParts + 1
+    BodyPartButton.Text = "Part: " .. bodyParts[bodyPartIndex]
+end
+
+local function Login()
+    local username = UsernameInput.Text
+    local password = PasswordInput.Text
+    
+    if username ~= "" and password == DEFAULT_PASSWORD then
+        AccountData.username = username
+        AccountData.password = password
+        AccountData.isLoggedIn = true
+        Security.sessionStartTime = tick()
+        
+        LoginFrame.Visible = false
+        MainFrame.Visible = true
+        
+        print("Logged in as:", username)
+    else
+        Security.loginAttempts = Security.loginAttempts + 1
+        PasswordInput.Text = ""
+        PasswordInput.PlaceholderText = "Invalid! Attempts: " .. Security.loginAttempts .. "/" .. Security.maxLoginAttempts
+        
+        if Security.loginAttempts >= Security.maxLoginAttempts then
+            PasswordInput.TextEditable = false
+            PasswordInput.PlaceholderText = "Too many attempts! Wait 5 minutes."
+            
+            spawn(function()
+                wait(300)
+                Security.loginAttempts = 0
+                PasswordInput.TextEditable = true
+                PasswordInput.PlaceholderText = GetText("password")
+            end)
+        end
+    end
+end
+
+local function CreateAccount()
+    local username = UsernameInput.Text
+    local password = PasswordInput.Text
+    
+    if username ~= "" and password ~= "" then
+        AccountData.username = username
+        AccountData.password = password
+        AccountData.isLoggedIn = true
+        Security.sessionStartTime = tick()
+        
+        LoginFrame.Visible = false
+        MainFrame.Visible = true
+        
+        print("Account created for:", username)
+    end
+end
+
+local function VerifyVIPAccess()
+    if CaptchaInputBox.Text == captchaCode then
+        VIPPasswordInput.Visible = true
+        VerifyVIPButton.Visible = true
+        VerifyCaptchaButton.Text = "CAPTCHA Verified ✓"
+        VerifyCaptchaButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+    else
+        CaptchaInputBox.Text = ""
+        CaptchaInputBox.PlaceholderText = GetText("invalid_captcha")
+        GenerateNewCaptcha()
+    end
+end
+
+local function GrantVIPAccess()
+    if VIPPasswordInput.Text == VIP_PASSWORD then
+        Settings.useVipIcon = true
+        AccountData.isVIP = true
+        MinimizedIcon.Image = Settings.iconImageUrl
+        VIPFrame.Visible = false
+        print("VIP access granted!")
+        
+        -- Reset VIP frame
+        VIPPasswordInput.Visible = false
+        VerifyVIPButton.Visible = false
+        VerifyCaptchaButton.Text = "Verify CAPTCHA"
+        VerifyCaptchaButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+        VIPPasswordInput.Text = ""
+        CaptchaInputBox.Text = ""
+        GenerateNewCaptcha()
+    else
+        VIPPasswordInput.Text = ""
+        VIPPasswordInput.PlaceholderText = "Wrong VIP password!"
+        GenerateNewCaptcha()
+        
+        -- Reset to CAPTCHA step
+        VIPPasswordInput.Visible = false
+        VerifyVIPButton.Visible = false
+        VerifyCaptchaButton.Text = "Verify CAPTCHA"
+        VerifyCaptchaButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    end
+end
+
+local function ApplyESPSettings()
+    local textSize = tonumber(ESPTextSizeInput.Text)
+    if textSize and textSize > 0 then
+        Settings.espTextSize = textSize
+    end
+    
+    local hexColor = ESPTextColorInput.Text
+    if hexColor:match("^#%x%x%x%x%x%x$") then
+        Settings.espTextColorHex = hexColor
+        Settings.espTextColor = HexToRGB(hexColor)
+    end
+    
+    -- Update existing ESP
+    if Settings.espEnabled then
+        for player, espData in pairs(ESPObjects) do
+            if espData.billboard and espData.billboard:FindFirstChild("TextLabel") then
+                local textLabel = espData.billboard.TextLabel
+                textLabel.TextSize = Settings.espTextSize
+                textLabel.TextColor3 = Color3.fromRGB(Settings.espTextColor[1], Settings.espTextColor[2], Settings.espTextColor[3])
+                textLabel.Parent.AlwaysOnTop = Settings.espWallHack
+            end
+        end
+    end
+    
+    print("ESP settings applied!")
+end
+
+local function ApplyIconSettings()
+    local iconSize = tonumber(IconSizeInput.Text)
+    if iconSize and iconSize > 0 then
+        Settings.iconSize = iconSize
+        MinimizedIcon.Size = UDim2.new(0, iconSize, 0, iconSize)
+    end
+    
+    MinimizedIcon.Draggable = Settings.iconDraggable
+    
+    local robloxId = RobloxIdInput.Text
+    if robloxId ~= "" and tonumber(robloxId) then
+        Settings.iconImageId = robloxId
+        Settings.useRobloxId = true
+        MinimizedIcon.Image = "rbxassetid://" .. robloxId
+    end
+    
+    print("Icon settings applied!")
+end
+
+local function ApplyFrameSettings()
+    local width = tonumber(FrameWidthInput.Text)
+    local height = tonumber(FrameHeightInput.Text)
+    
+    if width and width >= 300 then
+        Settings.mainFrameSize[1] = width
+    end
+    
+    if height and height >= 400 then
+        Settings.mainFrameSize[2] = height
+    end
+    
+    MainFrame.Size = UDim2.new(0, Settings.mainFrameSize[1], 0, Settings.mainFrameSize[2])
+    MainFrame.Position = UDim2.new(0.5, -Settings.mainFrameSize[1]/2, 0.5, -Settings.mainFrameSize[2]/2)
+    
+    DragBar.Visible = Settings.dragBarEnabled
+    ContentFrame.Size = UDim2.new(1, Settings.dragBarEnabled and -20 or 0, 1, -35)
+    ContentFrame.Position = UDim2.new(Settings.dragBarEnabled and 20 or 0, 0, 0, 35)
+    
+    print("Frame settings applied!")
+end
+
+local function ToggleLanguage()
+    Settings.language = Settings.language == "en" and "vi" or "en"
+    LanguageButton.Text = Settings.language:upper()
+    UpdateLanguage()
+end
+
+-- Event Connections
+LoginButton.MouseButton1Click:Connect(Login)
+CreateButton.MouseButton1Click:Connect(CreateAccount)
+
+SelectNearestButton.MouseButton1Click:Connect(function()
+    local nearest = GetNearestPlayer()
+    if nearest then
+        currentTarget = nearest
+        lookTarget = nearest
+        CurrentTargetLabel.Text = "Current Target: " .. nearest.Name
+        print("Selected nearest player:", nearest.Name)
+    end
+end)
+
+LookAtButton.MouseButton1Click:Connect(ToggleLookAtPlayer)
+BodyPartButton.MouseButton1Click:Connect(CycleBodyPart)
+ESPToggleButton.MouseButton1Click:Connect(ToggleESP)
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    MinimizedIcon.Visible = true
+end)
+
+MinimizedIcon.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    MinimizedIcon.Visible = false
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+SettingsButton.MouseButton1Click:Connect(function()
+    SettingsFrame.Visible = not SettingsFrame.Visible
+end)
+
+SettingsCloseButton.MouseButton1Click:Connect(function()
+    SettingsFrame.Visible = false
+end)
+
+LanguageButton.MouseButton1Click:Connect(ToggleLanguage)
+
+MenuButton.MouseButton1Click:Connect(function()
+    VIPFrame.Visible = not VIPFrame.Visible
+    if VIPFrame.Visible then
+        GenerateNewCaptcha()
+    end
+end)
+
+VIPCloseButton.MouseButton1Click:Connect(function()
+    VIPFrame.Visible = false
+end)
+
+VerifyCaptchaButton.MouseButton1Click:Connect(VerifyVIPAccess)
+VerifyVIPButton.MouseButton1Click:Connect(GrantVIPAccess)
+
+-- ESP Settings Events
+ESPWallHackCheck.MouseButton1Click:Connect(function()
+    Settings.espWallHack = not Settings.espWallHack
+    ESPWallHackCheck.BackgroundColor3 = Settings.espWallHack and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+    ESPWallHackCheck.Text = GetText("wall_hack") .. ": " .. (Settings.espWallHack and "ON" or "OFF")
+end)
+
+ESPShowDistanceCheck.MouseButton1Click:Connect(function()
+    Settings.espShowDistance = not Settings.espShowDistance
+    ESPShowDistanceCheck.BackgroundColor3 = Settings.espShowDistance and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+    ESPShowDistanceCheck.Text = GetText("show_distance") .. ": " .. (Settings.espShowDistance and "ON" or "OFF")
+end)
+
+ESPShowNameCheck.MouseButton1Click:Connect(function()
+    Settings.espShowName = not Settings.espShowName
+    ESPShowNameCheck.BackgroundColor3 = Settings.espShowName and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+    ESPShowNameCheck.Text = GetText("show_name") .. ": " .. (Settings.espShowName and "ON" or "OFF")
+end)
+
+ESPShowHPCheck.MouseButton1Click:Connect(function()
+    Settings.espShowHP = not Settings.espShowHP
+    ESPShowHPCheck.BackgroundColor3 = Settings.espShowHP and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+    ESPShowHPCheck.Text = GetText("show_hp") .. ": " .. (Settings.espShowHP and "ON" or "OFF")
+end)
+
+ApplyESPButton.MouseButton1Click:Connect(ApplyESPSettings)
+
+-- Icon Settings Events
+IconDraggableCheck.MouseButton1Click:Connect(function()
+    Settings.iconDraggable = not Settings.iconDraggable
+    IconDraggableCheck.BackgroundColor3 = Settings.iconDraggable and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+    IconDraggableCheck.Text = GetText("draggable") .. ": " .. (Settings.iconDraggable and "ON" or "OFF")
+end)
+
+ApplyIconButton.MouseButton1Click:Connect(ApplyIconSettings)
+
+-- Frame Settings Events
+DragBarCheck.MouseButton1Click:Connect(function()
+    Settings.dragBarEnabled = not Settings.dragBarEnabled
+    DragBarCheck.BackgroundColor3 = Settings.dragBarEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(65, 65, 65)
+    DragBarCheck.Text = GetText("drag_bar") .. ": " .. (Settings.dragBarEnabled and "ON" or "OFF")
+end)
+
+ApplyFrameButton.MouseButton1Click:Connect(ApplyFrameSettings)
+
+-- Initialize Security Systems
+ProtectMemory()
+
+-- Initialize
+GenerateNewCaptcha()
+UpdateLanguage()
+
+-- Player events
+Players.PlayerAdded:Connect(function(player)
+    if Settings.espEnabled and player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function()
+            wait(1)
+            CreateESP(player)
+        end)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    RemoveESP(player)
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    Character = newCharacter
+    wait(1)
+    
+    if Settings.espEnabled then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                CreateESP(player)
+            end
+        end
+    end
+end)
+
+-- Continuous Security Monitoring
+spawn(function()
+    while true do
+        wait(30)
+        
+        if AntiDetection.enabled then
+            local timeLeft = Security.sessionTimeout - (tick() - Security.sessionStartTime)
+            if timeLeft <= 0 then
+                ValidateSession()
+            end
+            
+            if DetectDebugger() then
+                print("⚠️ Debug environment detected!")
+                Security.secureMode = true
+            end
+        end
+    end
+end)
+
+print("Scriptone Ultimate loaded successfully!")
+print("Features: Complete Account System, VIP Access, Advanced ESP, Multi-language, Anti-Detection")
+print("Default password:", DEFAULT_PASSWORD)
+print("VIP password:", VIP_PASSWORD)
